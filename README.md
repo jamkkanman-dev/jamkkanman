@@ -16,6 +16,10 @@
 - Pleos Vehicle SDK 2.3.2, NaviHelper SDK 3.0.5
 - Android Gradle Plugin 8.8.2, Gradle 8.10.2, Kotlin 2.0.0, compileSdk 35 / minSdk 28
 
+## 개발 방식
+
+- 기획과 기능 설계는 직접 했으며, 코드 작성과 자료 조사에 AI 도구(Claude)를 활용했습니다.
+
 ## 오픈소스
 
 - Gradle Wrapper (Apache License 2.0)

@@ -16,5 +16,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "MyLane"
+rootProject.name = "Jamkkanman"
 include(":probe")
