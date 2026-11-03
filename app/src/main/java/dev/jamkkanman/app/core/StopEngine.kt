@@ -61,7 +61,8 @@ class StopEngine(
     fun onGear(value: VehicleGear?) {
         val before = gear
         gear = value
-        if (value == VehicleGear.GEAR_PARK && before != VehicleGear.GEAR_PARK) stopMoment("기어 P")
+        // 앱을 켰을 때 이미 P인 경우(처음 읽은 값)는 '멈추는 순간'이 아니라 안내하지 않는다
+        if (before != null && value == VehicleGear.GEAR_PARK && before != VehicleGear.GEAR_PARK) stopMoment("기어 P")
         onChange()
     }
 
@@ -138,6 +139,8 @@ class StopEngine(
             ledger.appendDemand("warn", top.zone.type, fix.lat, fix.lon)
             pending = Pending(top.zone.type, fix.lat, fix.lon, now)
             log("$reason: ${top.zone.type.title} (${Speech.metersShort(top.distanceM)}) → 안내")
+        } else if (!result.covered) {
+            log("$reason: 금지구역 데이터가 없는 지역이라 확인하지 않음")
         } else {
             if (moved != null) speak(Speech.moved(moved))
             log("$reason: 금지구역 아님${if (moved != null) " · 옮겨 세움 ${Speech.won(moved)}" else ""}")
@@ -151,7 +154,7 @@ class StopEngine(
         pending = null
         if (now - p.atMs > PENDING_MS) return null
         val movedFar = Geo.distanceM(p.lat, p.lon, fix.lat, fix.lon) >= SAME_SPOT_M
-        if (!movedFar || result.hits.any { it.certain }) return null
+        if (!movedFar || !result.covered || result.hits.any { it.certain }) return null
         val fine = p.type.fineAt(result.hour)
         ledger.recordMoved(fine)
         ledger.appendDemand("moved", p.type, p.lat, p.lon)

@@ -4,7 +4,7 @@
   1) 어떤 레이어가 있는지 보기
      python3 tools/build_basemap.py inspect <압축 푼 폴더>
   2) 지도 파일 만들기 (레이어이름=shp경로[:필드=값|값...])
-     python3 tools/build_basemap.py build app/src/main/assets/basemap_daechi.json \
+     python3 tools/build_basemap.py build app/src/debug/assets/basemap_daechi.json \
          building=<폴더>/TL_SPBD_BULD.shp \
          roadarea=<폴더>/TL_SPRD_RW.shp \
          roadline=<폴더>/TL_SPRD_MANAGE.shp \

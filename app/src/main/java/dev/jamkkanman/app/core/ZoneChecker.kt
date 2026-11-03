@@ -19,15 +19,28 @@ data class CheckResult(
     val hits: List<ZoneHit>,
     val spot: SpotHint?,
     val hour: Int,
+    /** false면 금지구역 데이터가 없는 지역이라 '세워도 된다'고 말할 수 없다 */
+    val covered: Boolean = true,
 ) {
     val top: ZoneHit? get() = hits.firstOrNull()
-    val isClear: Boolean get() = hits.isEmpty()
+    val isClear: Boolean get() = hits.isEmpty() && covered
 }
 
 class ZoneChecker(val data: ZoneData) {
 
+    // 데이터가 들어 있는 범위 (금지구역 위치의 바깥 사각형 + 여유 300m)
+    private val latMin = (data.zones.minOfOrNull { it.lat } ?: 0.0) - COVER_MARGIN_DEG
+    private val latMax = (data.zones.maxOfOrNull { it.lat } ?: 0.0) + COVER_MARGIN_DEG
+    private val lonMin = (data.zones.minOfOrNull { it.lon } ?: 0.0) - COVER_MARGIN_DEG
+    private val lonMax = (data.zones.maxOfOrNull { it.lon } ?: 0.0) + COVER_MARGIN_DEG
+
+    /** 이 자리를 확인할 데이터가 있는지 (지금은 대치동과 그 주변만) */
+    fun covers(lat: Double, lon: Double): Boolean =
+        data.zones.isNotEmpty() && lat in latMin..latMax && lon in lonMin..lonMax
+
     /** 멈춘 자리 하나를 확인한다. */
     fun check(fix: Fix, hour: Int = currentHour()): CheckResult {
+        if (!covers(fix.lat, fix.lon)) return CheckResult(fix, emptyList(), null, hour, covered = false)
         // GPS 오차의 절반(최대 5m)까지는 '그럴 수 있음'으로 알린다.
         val margin = ((fix.accuracyM ?: 0f) * 0.5).coerceIn(0.0, 5.0)
         val hits = data.zones.mapNotNull { z ->
@@ -59,6 +72,9 @@ class ZoneChecker(val data: ZoneData) {
             .minByOrNull { it.distanceM }
 
     companion object {
+        /** 약 300m */
+        private const val COVER_MARGIN_DEG = 0.003
+
         /** 한국 시각 기준 (기기 시간대와 무관) */
         fun currentHour(): Int = KoreaTime.hour()
     }

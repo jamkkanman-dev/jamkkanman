@@ -18,6 +18,8 @@
     <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />
     <uses-permission android:name="pleos.car.permission.CAR_LIGHTS" />
     <uses-permission android:name="pleos.car.permission.CAR_DOORS" />
+    <!-- 계기판 경고등(Telltales): 좌우 방향지시등 표시가 동시에 켜지면 비상등으로 판단 -->
+    <uses-permission android:name="pleos.car.permission.CAR_SAFETY" />
 
     <!-- Pleos NaviHelper SDK: 현재 위치·목적지 조회, 경유지 추가 -->
     <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />

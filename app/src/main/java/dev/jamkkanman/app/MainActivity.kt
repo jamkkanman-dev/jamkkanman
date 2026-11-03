@@ -289,6 +289,16 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
                 if (top.certain && top.exitM in 0.5..12.0) lines += "약 ${Speech.metersShort(top.exitM + 1.0)}만 옮기면 범위 밖이에요"
                 detailText.text = lines.joinToString("\n")
             }
+            !result.covered -> {
+                // 데이터가 없는 곳에서 '세워도 돼요'라고 하면 틀린 안내가 되니 범위 밖이라고 알린다
+                mood = StopMapView.Mood.NEUTRAL
+                stateChip.text = "확인 범위 밖"
+                ui.styleChip(stateChip, Palette.TEXT2, Palette.SURFACE_HIGH)
+                reasonText.text = "${reason ?: "정차"} · ${checkedTime()}"
+                titleText.text = "이 지역은 아직 확인할 수 없어요"
+                titleText.setTextColor(Palette.TEXT)
+                detailText.text = "지금은 ${data.region} 금지구역 데이터만 들어 있어요.\n시연 버튼으로 대치동 지점을 골라 보세요."
+            }
             else -> {
                 mood = StopMapView.Mood.CLEAR
                 stateChip.text = "정차 가능"

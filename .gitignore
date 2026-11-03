@@ -21,3 +21,4 @@ probe-report*.txt
 
 # 행정안전부 도로명주소 도형에서 만든 지도 배경: 국외 반출 금지 조건이라 깃허브(해외 서버)에 올리지 않음
 app/src/main/assets/basemap_daechi.json
+app/src/debug/assets/basemap_daechi.json
