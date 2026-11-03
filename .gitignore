@@ -17,3 +17,4 @@ secrets.properties
 
 # 테스트 앱이 만든 기록 파일
 probe-report*.txt
+.Rhistory

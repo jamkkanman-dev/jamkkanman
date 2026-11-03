@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 잠깐만 아이콘: 위치 핀 안의 일시정지 표시 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FF1B2433"
+        android:pathData="M24,4h60a20,20 0,0 1,20 20v60a20,20 0,0 1,-20 20h-60a20,20 0,0 1,-20 -20v-60a20,20 0,0 1,20 -20z" />
+    <path
+        android:fillColor="#FFFFB84D"
+        android:pathData="M54,18c-15.5,0 -28,12.3 -28,27.6c0,20.7 28,44.4 28,44.4s28,-23.7 28,-44.4c0,-15.3 -12.5,-27.6 -28,-27.6z" />
+    <path
+        android:fillColor="#FF1B2433"
+        android:pathData="M44,33h7v26h-7z M57,33h7v26h-7z" />
+</vector>

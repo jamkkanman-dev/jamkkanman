@@ -17,4 +17,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Jamkkanman"
+include(":app")
 include(":probe")
