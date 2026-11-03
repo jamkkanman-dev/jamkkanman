@@ -15,7 +15,7 @@
 
 - 멈춤 감지: 기어 레버 위치(Android Automotive 표준 속성 GEAR_SELECTION, Pleos SDK 권장 방식), 방향지시등·문 열림(Pleos Vehicle SDK)
 - 금지구역 확인: 소방용수시설(소화전 등) 5m, 버스정류장 10m, 어린이보호구역(초등학교·학원가 시설 반경 100m로 추정). 횡단보도 10m·교차로 모퉁이 5m는 판단 로직만 있고 데이터는 다음 버전에 추가
-- 안내: 같은 자리에서는 한 번만 음성 안내, 가까운 세울 곳 표시와 내비 길 안내·경유지 추가(Pleos NaviHelper SDK)
+- 안내: 같은 자리에서는 한 번만 음성 안내(Pleos TextToSpeech SDK, 기기 내 합성), 가까운 세울 곳 표시와 내비 길 안내·경유지 추가(Pleos NaviHelper SDK)
 - 도착 전 안내: 목적지 앞이 금지구역이면 도착 700m 전에 알리고 세울 곳을 경유지로 추가
 - 이번 달 아낀 과태료: 알림 뒤 금지구역 밖으로 옮겨 세웠을 때만 더함
 - 정차 수요 기록: 운전자가 동의했을 때만, 약 50m 칸·시간대·요일만 차 안에 저장
@@ -39,7 +39,7 @@
 ## 테스트 환경
 
 - Pleos Connect Emulator v2.1.0 (Android 14, API 34, arm64)
-- Pleos Vehicle SDK 2.3.2, NaviHelper SDK 3.0.5
+- Pleos Vehicle SDK 2.3.2, NaviHelper SDK 3.0.5, TextToSpeech SDK 3.3.1
 - Android Gradle Plugin 8.8.2, Gradle 8.10.2, Kotlin 2.0.0, compileSdk 35 / minSdk 28
 
 ## 개발 방식

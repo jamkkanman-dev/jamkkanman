@@ -21,6 +21,14 @@
     <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />
     <uses-permission android:name="pleos.car.permission.NAVI_ROUTE_SEARCH" />
 
+    <!-- Pleos TextToSpeech SDK: 한국어 음성 안내 -->
+    <uses-permission android:name="pleos.car.permission.TTS_SERVICE" />
+
+    <!-- Pleos 음성 서비스 앱 설치 여부 확인 -->
+    <queries>
+        <package android:name="ai.pleos.playground.caas" />
+    </queries>
+
     <application
         android:allowBackup="false"
         android:icon="@drawable/ic_launcher"

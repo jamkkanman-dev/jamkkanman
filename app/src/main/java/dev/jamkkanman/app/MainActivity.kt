@@ -101,7 +101,7 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
         }
         checker = ZoneChecker(data)
         ledger = Ledger(this)
-        voice = Voice(this) { status ->
+        voice = Voice(this, BuildConfig.PLEOS_CLIENT_ID, BuildConfig.PLEOS_CLIENT_SECRET) { status ->
             voiceStatus = status
             log(status)
         }
@@ -278,7 +278,7 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
         }
         guideButton.tag = spot?.spot
         ui.setButtonEnabled(repeatButton, engine.lastSpoken != null)
-        spokenText.text = engine.lastSpoken?.let { "음성 안내: $it" } ?: voiceStatus
+        spokenText.text = listOfNotNull(engine.lastSpoken?.let { "음성: $it" }, voiceStatus).joinToString("\n")
     }
 
     private fun renderSide() {
@@ -397,7 +397,7 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
         buttons.addView(repeatButton, ui.lp(WRAP, WRAP))
         body.addView(buttons, ui.lp(MATCH, WRAP, top = 20))
 
-        spokenText = ui.text(15f, Palette.FAINT).apply { maxLines = 2 }
+        spokenText = ui.text(15f, Palette.FAINT).apply { maxLines = 3 }
         body.addView(spokenText, ui.lp(MATCH, WRAP, top = 16))
 
         card.addView(ScrollView(this).apply { addView(body) }, ui.lp(MATCH, 0, 1f))
