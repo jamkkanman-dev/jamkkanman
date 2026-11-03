@@ -1,4 +1,4 @@
-package dev.mylane.probe
+package dev.jamkkanman.probe
 
 import android.content.Context
 import android.os.Handler
@@ -193,7 +193,7 @@ class PleosExplorer(
             when (m.name) {
                 "hashCode" -> System.identityHashCode(proxy)
                 "equals" -> proxy === margs?.getOrNull(0)
-                "toString" -> "MyLaneProbe.$label"
+                "toString" -> "JamkkanmanProbe.$label"
                 else -> {
                     handle("$label.${m.name}", margs?.toList() ?: emptyList())
                     null

@@ -4,14 +4,14 @@ plugins {
 }
 
 android {
-    namespace = "dev.mylane.probe"
+    namespace = "dev.jamkkanman.probe"
     compileSdk = 35
 
     // Android Automotive 표준 차량 API(CarPropertyManager)
     useLibrary("android.car")
 
     defaultConfig {
-        applicationId = "dev.mylane.probe"
+        applicationId = "dev.jamkkanman.probe"
         minSdk = 28
         targetSdk = 34
         versionCode = 1

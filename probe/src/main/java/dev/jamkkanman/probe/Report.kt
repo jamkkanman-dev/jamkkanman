@@ -1,4 +1,4 @@
-package dev.mylane.probe
+package dev.jamkkanman.probe
 
 import android.content.Context
 import android.util.Log
@@ -59,7 +59,7 @@ class Report(private val context: Context) {
     }
 
     companion object {
-        const val TAG = "MyLaneProbe"
+        const val TAG = "JamkkanmanProbe"
         const val FILE_NAME = "probe-report.txt"
         private const val MAX_SCREEN_LINES = 300
     }
