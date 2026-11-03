@@ -11,6 +11,8 @@
 
     <!-- 기어 레버 위치 (Android Automotive 표준 속성 GEAR_SELECTION) -->
     <uses-permission android:name="android.car.permission.CAR_POWERTRAIN" />
+    <!-- 비상등 상태 (Android Automotive 표준 속성 HAZARD_LIGHTS_STATE) -->
+    <uses-permission android:name="android.car.permission.CAR_EXTERIOR_LIGHTS" />
 
     <!-- Pleos Vehicle SDK: 기어(대체용), 방향지시등, 문 -->
     <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />

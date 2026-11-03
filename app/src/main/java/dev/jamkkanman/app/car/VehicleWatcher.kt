@@ -21,13 +21,19 @@ class VehicleWatcher(context: Context, private val events: Events) {
     interface Events {
         fun onGear(gear: VehicleGear?)
         fun onTurnSignal(value: TurnSignalValue?)
+        fun onHazardLights(on: Boolean)
         fun onDoor(door: DoorValue, open: Boolean)
         fun onVehicleLog(message: String)
     }
 
     private val vehicle = Vehicle(context.applicationContext)
     private val main = Handler(Looper.getMainLooper())
-    private val aaosGear = CarGearSource(context.applicationContext, { g -> events.onGear(g) }, { m -> events.onVehicleLog(m) })
+    private val aaosGear = CarGearSource(
+        context.applicationContext,
+        onGear = { g -> events.onGear(g) },
+        log = { m -> events.onVehicleLog(m) },
+        onHazard = { on -> events.onHazardLights(on) },
+    )
     private var usingPleosGear = false
     private var started = false
     private var subscribed = false

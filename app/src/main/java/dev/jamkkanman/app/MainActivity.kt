@@ -38,9 +38,9 @@ import dev.jamkkanman.app.ui.UiKit
 import dev.jamkkanman.app.ui.UiKit.Companion.MATCH
 import dev.jamkkanman.app.ui.UiKit.Companion.WRAP
 import dev.jamkkanman.app.core.BaseMap
+import dev.jamkkanman.app.core.KoreaTime
 import dev.jamkkanman.app.core.RoadMap
 import dev.jamkkanman.app.ui.StopMapView
-import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
@@ -56,7 +56,7 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
 
     private val handler = Handler(Looper.getMainLooper())
     private val ui by lazy { UiKit(this) }
-    private val timeFormat = SimpleDateFormat("HH:mm", Locale.KOREA)
+    private val timeFormat = KoreaTime.format("HH:mm")
 
     private lateinit var data: ZoneData
     private lateinit var checker: ZoneChecker
@@ -102,6 +102,8 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
     private lateinit var demoStrip: View
     private lateinit var settingsOverlay: View
     private lateinit var logText: TextView
+    private val logHistory = ArrayDeque<String>()
+    private var logExpanded = false
     private lateinit var driveOverlay: View
     private lateinit var driveSpoken: TextView
 
@@ -178,6 +180,8 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
 
     override fun onTurnSignal(value: TurnSignalValue?) = engine.onTurnSignal(value)
 
+    override fun onHazardLights(on: Boolean) = engine.onHazard(on)
+
     override fun onDoor(door: DoorValue, open: Boolean) = engine.onDoor(door, open)
 
     override fun onVehicleLog(message: String) = log(message)
@@ -207,8 +211,16 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
 
     private fun log(message: String) {
         lastLog = "${timeFormat.format(Date())}  $message"
+        logHistory.addFirst(lastLog)
+        while (logHistory.size > LOG_KEEP) logHistory.removeLast()
         Log.i(TAG, message)
-        if (built) logText.text = lastLog
+        if (built) showLog()
+    }
+
+    /** 맨 아래 기록 줄: 평소엔 마지막 한 줄, 누르면 최근 기록을 펼친다 (차량 신호 점검용) */
+    private fun showLog() {
+        logText.text = if (logExpanded) logHistory.joinToString("\n") else lastLog
+        logText.maxLines = if (logExpanded) LOG_KEEP else 1
     }
 
     // ------------------------------------------------------------------ 화면 그리기
@@ -363,7 +375,13 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
         demoStrip = buildDemoStrip()
         page.addView(demoStrip, ui.lp(MATCH, WRAP, top = 16))
 
-        logText = ui.text(18, Palette.TEXT4, value = lastLog).apply { maxLines = 1 }
+        logText = ui.text(18, Palette.TEXT4, value = lastLog).apply {
+            maxLines = 1
+            setOnClickListener {
+                logExpanded = !logExpanded
+                showLog()
+            }
+        }
         page.addView(logText, ui.lp(MATCH, WRAP, top = 8))
 
         root.addView(page, FrameLayout.LayoutParams(MATCH, MATCH))
@@ -559,6 +577,12 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
             background = ui.rounded(Palette.SURFACE, 28)
         }
         row.addView(ui.text(24, Palette.TEXT, bold = true, value = "시연"), ui.lp(WRAP, WRAP, end = 16))
+        // 자주 누르는 버튼을 앞에 둔다 (창이 좁아도 바로 보이게)
+        row.addView(ui.button("멈춤 신호", UiKit.ButtonStyle.PRIMARY, sizePx = 24, heightPx = 72) { engine.stopMoment("시연 정차") }, ui.lp(WRAP, WRAP, end = 10))
+        row.addView(ui.button("초기화", UiKit.ButtonStyle.OUTLINE, sizePx = 24, heightPx = 72) {
+            engine.resetSession()
+            log("초기화: 같은 자리 안내 기록을 지움")
+        }, ui.lp(WRAP, WRAP, end = 24))
         for (place in data.demo) {
             row.addView(ui.button(place.label, UiKit.ButtonStyle.OUTLINE, sizePx = 24, heightPx = 72) {
                 locations.setDemo(place.lat, place.lon, place.label)
@@ -566,14 +590,12 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
                 render()
             }, ui.lp(WRAP, WRAP, end = 10))
         }
-        row.addView(ui.button("멈춤 신호", UiKit.ButtonStyle.PRIMARY, sizePx = 24, heightPx = 72) { engine.stopMoment("시연 정차") }, ui.lp(WRAP, WRAP, end = 10))
         row.addView(ui.button("도착 전 안내", UiKit.ButtonStyle.OUTLINE, sizePx = 24, heightPx = 72) { demoArrival() }, ui.lp(WRAP, WRAP, end = 10))
         row.addView(ui.button("시연 위치 끄기", UiKit.ButtonStyle.OUTLINE, sizePx = 24, heightPx = 72) {
             locations.clearDemo()
             log("시연 위치 끔")
             render()
-        }, ui.lp(WRAP, WRAP, end = 10))
-        row.addView(ui.button("초기화", UiKit.ButtonStyle.OUTLINE, sizePx = 24, heightPx = 72) { engine.resetSession() }, ui.lp(WRAP, WRAP))
+        }, ui.lp(WRAP, WRAP))
         return HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
             addView(row)
@@ -621,6 +643,7 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
 
     companion object {
         private const val TAG = "Jamkkanman"
+        private const val LOG_KEEP = 12
         private const val REQ_LOCATION = 2001
     }
 }

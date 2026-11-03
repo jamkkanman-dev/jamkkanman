@@ -118,6 +118,7 @@ class StopMapView(context: Context, private val unit: Float) : View(context) {
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+        tagRects.clear()
         val bm = base
         canvas.drawColor(if (bm != null) LAND else MAP_BG)
         val c = center
@@ -384,11 +385,21 @@ class StopMapView(context: Context, private val unit: Float) : View(context) {
         label.textSize = u(22f)
     }
 
-    /** 흰 말풍선 라벨 */
+    /** 이번 화면에 이미 그린 말풍선 자리 (겹치면 위로 올린다) */
+    private val tagRects = ArrayList<RectF>()
+
+    /** 흰 말풍선 라벨. 먼저 그린 말풍선과 겹치면 겹치지 않을 때까지 위로 올린다. */
     private fun drawTag(canvas: Canvas, x: Float, y: Float, text: String, color: Int) {
         val w = tag.measureText(text) + u(36f)
         val h = u(48f)
         rect.set(x - w / 2, y - h, x + w / 2, y)
+        var tries = 0
+        while (tries < 4 && tagRects.any { RectF.intersects(it, rect) }) {
+            rect.offset(0f, -(h + u(8f)))
+            tries++
+        }
+        tagRects += RectF(rect)
+        val bottomY = rect.bottom
         fill.color = 0x29000000
         rect.offset(0f, u(4f))
         canvas.drawRoundRect(rect, h / 2, h / 2, fill)
@@ -397,7 +408,7 @@ class StopMapView(context: Context, private val unit: Float) : View(context) {
         canvas.drawRoundRect(rect, h / 2, h / 2, fill)
         tag.color = color
         tag.textAlign = Paint.Align.CENTER
-        canvas.drawText(text, x, y - h / 2 + u(8.5f), tag)
+        canvas.drawText(text, x, bottomY - h / 2 + u(8.5f), tag)
     }
 
     private fun drawPin(canvas: Canvas, x: Float, y: Float, scale: Float, color: Int) {

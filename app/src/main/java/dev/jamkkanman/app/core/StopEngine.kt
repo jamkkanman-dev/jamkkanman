@@ -53,6 +53,7 @@ class StopEngine(
     private var session: Session? = null
     private var pending: Pending? = null
     private var turnSignalSeen = false
+    private var hazardDirect = false
     private var announcedDestination: String? = null
 
     // ------------------------------------------------------------------ 차량 신호
@@ -65,11 +66,25 @@ class StopEngine(
     }
 
     /**
-     * Pleos의 방향지시등 값은 끔/왼쪽/오른쪽 세 가지뿐이다.
-     * 비상등(좌우 동시)은 정해진 값이 없어 null로 들어오는 것으로 보고,
-     * 정상값을 한 번이라도 받은 뒤에 null이 오면 비상등으로 판단한다. (에뮬레이터에서 확인 예정)
+     * 비상등을 직접 알려 주는 신호 (Android Automotive 표준 속성 HAZARD_LIGHTS_STATE).
+     * 이 신호를 한 번이라도 받으면 아래 방향지시등 추정은 쓰지 않는다.
+     */
+    fun onHazard(on: Boolean) {
+        hazardDirect = true
+        val before = hazardOn
+        hazardOn = on
+        if (on && !before) stopMoment("비상등")
+        onChange()
+    }
+
+    /**
+     * 비상등 표준 속성을 못 받는 차를 위한 예비 판단.
+     * Pleos의 방향지시등 값은 끔/왼쪽/오른쪽 세 가지뿐이라 비상등(좌우 동시)은 null로 들어오는 것으로 보고,
+     * 정상값을 한 번이라도 받은 뒤에 null이 오면 비상등으로 판단한다.
      */
     fun onTurnSignal(value: TurnSignalValue?) {
+        log("방향지시등 값: ${value ?: "없음(null)"}")
+        if (hazardDirect) return
         val hazard = value == null && turnSignalSeen
         if (value != null) turnSignalSeen = true
         val before = hazardOn

@@ -1,6 +1,5 @@
 package dev.jamkkanman.app.core
 
-import java.util.Calendar
 import kotlin.math.max
 
 data class ZoneHit(
@@ -60,6 +59,7 @@ class ZoneChecker(val data: ZoneData) {
             .minByOrNull { it.distanceM }
 
     companion object {
-        fun currentHour(): Int = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        /** 한국 시각 기준 (기기 시간대와 무관) */
+        fun currentHour(): Int = KoreaTime.hour()
     }
 }

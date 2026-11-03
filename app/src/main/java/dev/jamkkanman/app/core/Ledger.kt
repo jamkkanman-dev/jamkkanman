@@ -3,10 +3,8 @@ package dev.jamkkanman.app.core
 import android.content.Context
 import org.json.JSONObject
 import java.io.File
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
-import java.util.Locale
 import kotlin.math.roundToLong
 
 /**
@@ -19,7 +17,7 @@ class Ledger(context: Context) {
     private val prefs = context.getSharedPreferences("ledger", Context.MODE_PRIVATE)
     private val demandFile = File(context.filesDir, DEMAND_FILE)
 
-    private fun monthKey(): String = SimpleDateFormat("yyyy-MM", Locale.KOREA).format(Date())
+    private fun monthKey(): String = KoreaTime.format("yyyy-MM").format(Date())
 
     val monthSavedWon: Int get() = prefs.getInt("saved_${monthKey()}", 0)
     val monthMovedCount: Int get() = prefs.getInt("moved_${monthKey()}", 0)
@@ -51,7 +49,7 @@ class Ledger(context: Context) {
     /** 동의한 경우에만 익명 칸 단위로 한 줄 남긴다. event: warn(알림) / moved(옮겨 세움) */
     fun appendDemand(event: String, type: ZoneType, lat: Double, lon: Double) {
         if (!shareConsent) return
-        val cal = Calendar.getInstance()
+        val cal = KoreaTime.calendar()
         val line = JSONObject()
             .put("event", event)
             .put("type", type.name)
