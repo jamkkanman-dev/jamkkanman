@@ -374,8 +374,9 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
         val page = ui.vertical().apply { setPadding(ui.px(28), ui.px(24), ui.px(28), ui.px(16)) }
         val content = if (portrait) ui.vertical() else ui.horizontal().apply { gravity = Gravity.TOP }
         if (portrait) {
-            content.addView(buildMapCard(), ui.lp(MATCH, 0, 1f))
-            content.addView(buildPanel(), ui.lp(MATCH, WRAP, top = 24))
+            // 세로 화면: 지도 위, 안내 아래. 비율을 고정하고 안내는 길어지면 스크롤한다
+            content.addView(buildMapCard(), ui.lp(MATCH, 0, 1.1f))
+            content.addView(buildPanel(), ui.lp(MATCH, 0, 1f, top = 24))
         } else {
             content.addView(buildMapCard(), ui.lp(0, MATCH, 1.25f))
             content.addView(buildPanel(), ui.lp(0, MATCH, 1f, start = 24))
