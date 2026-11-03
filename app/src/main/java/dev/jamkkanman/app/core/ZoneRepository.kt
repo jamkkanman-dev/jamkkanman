@@ -27,6 +27,7 @@ object ZoneRepository {
                 lon = o.getDouble("lon"),
                 source = o.optString("source"),
                 radiusM = o.optDouble("radius", type.radiusM),
+                shape = o.optJSONArray("shape")?.let { arr -> DoubleArray(arr.length()) { arr.getDouble(it) } },
             )
         }
         val spots = root.optJSONArray("spots").objects().mapNotNull { o ->

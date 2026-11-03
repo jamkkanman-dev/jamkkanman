@@ -44,7 +44,9 @@ class ZoneChecker(val data: ZoneData) {
         // GPS 오차의 절반(최대 5m)까지는 '그럴 수 있음'으로 알린다.
         val margin = ((fix.accuracyM ?: 0f) * 0.5).coerceIn(0.0, 5.0)
         val hits = data.zones.mapNotNull { z ->
-            val d = Geo.distanceM(fix.lat, fix.lon, z.lat, z.lon)
+            // 멀리 있는 구역은 모양 계산 전에 거른다
+            if (Geo.distanceM(fix.lat, fix.lon, z.lat, z.lon) > z.radiusM + FAR_SKIP_M) return@mapNotNull null
+            val d = z.distanceTo(fix.lat, fix.lon)
             when {
                 d <= z.radiusM -> ZoneHit(z, d, certain = true)
                 d <= z.radiusM + margin -> ZoneHit(z, d, certain = false)
@@ -61,7 +63,8 @@ class ZoneChecker(val data: ZoneData) {
     /** 목적지처럼 '앞으로 세울 자리' 주변의 금지구역 (반경 + 여유) */
     fun zonesNear(lat: Double, lon: Double, extraM: Double, hour: Int = currentHour()): List<ZoneHit> =
         data.zones.mapNotNull { z ->
-            val d = Geo.distanceM(lat, lon, z.lat, z.lon)
+            if (Geo.distanceM(lat, lon, z.lat, z.lon) > z.radiusM + extraM + FAR_SKIP_M) return@mapNotNull null
+            val d = z.distanceTo(lat, lon)
             if (d <= z.radiusM + extraM) ZoneHit(z, d, certain = d <= z.radiusM) else null
         }.sortedWith(compareByDescending<ZoneHit> { it.zone.type.fineAt(hour) }.thenBy { it.distanceM })
 
@@ -74,6 +77,8 @@ class ZoneChecker(val data: ZoneData) {
     companion object {
         /** 약 300m */
         private const val COVER_MARGIN_DEG = 0.003
+        /** 중심점이 반경보다 이만큼 더 멀면 모양을 볼 필요도 없다 (가장 긴 횡단보도의 절반보다 넉넉히) */
+        private const val FAR_SKIP_M = 60.0
 
         /** 한국 시각 기준 (기기 시간대와 무관) */
         fun currentHour(): Int = KoreaTime.hour()

@@ -1,7 +1,6 @@
 package dev.jamkkanman.app.core
 
 import android.content.Context
-import android.graphics.Path
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.math.hypot
@@ -18,8 +17,55 @@ class BaseMap(
     val areas: Map<String, List<Area>>,
     val lines: List<NamedLine>,
 ) {
-    /** 면 하나 (구멍이 있는 다각형은 고리를 모두 넣고 EVEN_ODD 로 채운다) */
-    class Area(val path: Path, val minX: Float, val minY: Float, val maxX: Float, val maxY: Float)
+    /**
+     * 면 하나. rings[0]이 바깥 고리, 나머지는 구멍 (그릴 때 EVEN_ODD 로 채운다).
+     * 화면은 매번 원근 투영해서 그리므로 미터 좌표를 그대로 들고 있는다.
+     */
+    class Area(val rings: List<FloatArray>) {
+        val minX: Float
+        val minY: Float
+        val maxX: Float
+        val maxY: Float
+        /** 바깥 고리의 중심과 넓이(m²) */
+        val cx: Float
+        val cy: Float
+        val areaM2: Float
+        /** 바깥 고리가 반시계 방향이면 true (벽의 바깥쪽을 정할 때 쓴다) */
+        val ccw: Boolean
+
+        init {
+            var x0 = Float.MAX_VALUE
+            var y0 = Float.MAX_VALUE
+            var x1 = -Float.MAX_VALUE
+            var y1 = -Float.MAX_VALUE
+            for (r in rings) {
+                var k = 0
+                while (k + 1 < r.size) {
+                    if (r[k] < x0) x0 = r[k]
+                    if (r[k] > x1) x1 = r[k]
+                    if (r[k + 1] < y0) y0 = r[k + 1]
+                    if (r[k + 1] > y1) y1 = r[k + 1]
+                    k += 2
+                }
+            }
+            minX = x0; minY = y0; maxX = x1; maxY = y1
+            val outer = rings.firstOrNull() ?: FloatArray(0)
+            val n = outer.size / 2
+            var signed = 0f
+            var sx = 0f
+            var sy = 0f
+            for (i in 0 until n) {
+                val j = (i + 1) % n
+                signed += outer[i * 2] * outer[j * 2 + 1] - outer[j * 2] * outer[i * 2 + 1]
+                sx += outer[i * 2]
+                sy += outer[i * 2 + 1]
+            }
+            areaM2 = kotlin.math.abs(signed) / 2f
+            ccw = signed > 0f
+            cx = if (n > 0) sx / n else 0f
+            cy = if (n > 0) sy / n else 0f
+        }
+    }
 
     class NamedLine(
         val name: String,
@@ -87,27 +133,13 @@ class BaseMap(
         }.getOrNull()
 
         private fun parseArea(rings: JSONArray): Area? {
-            val path = Path().apply { fillType = Path.FillType.EVEN_ODD }
-            var x0 = Float.MAX_VALUE
-            var y0 = Float.MAX_VALUE
-            var x1 = -Float.MAX_VALUE
-            var y1 = -Float.MAX_VALUE
+            val list = ArrayList<FloatArray>(rings.length())
             for (r in 0 until rings.length()) {
                 val ring = rings.getJSONArray(r)
-                var k = 0
-                while (k + 1 < ring.length()) {
-                    val x = ring.getDouble(k).toFloat()
-                    val y = ring.getDouble(k + 1).toFloat()
-                    if (k == 0) path.moveTo(x, y) else path.lineTo(x, y)
-                    if (x < x0) x0 = x
-                    if (x > x1) x1 = x
-                    if (y < y0) y0 = y
-                    if (y > y1) y1 = y
-                    k += 2
-                }
-                path.close()
+                if (ring.length() < 6) continue
+                list += FloatArray(ring.length()) { ring.getDouble(it).toFloat() }
             }
-            return if (x0 == Float.MAX_VALUE) null else Area(path, x0, y0, x1, y1)
+            return if (list.isEmpty()) null else Area(list)
         }
     }
 }

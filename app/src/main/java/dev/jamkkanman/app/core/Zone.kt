@@ -44,7 +44,34 @@ data class Zone(
     val source: String,
     /** 이 구역의 반경(m). 어린이보호구역처럼 시설마다 다를 수 있다. */
     val radiusM: Double = type.radiusM,
-)
+    /** 구역의 실제 모양 (위도, 경도, 위도, 경도 …). 횡단보도처럼 모양이 있으면 테두리에서 반경을 잰다. */
+    val shape: DoubleArray? = null,
+) {
+    /** 이 자리에서 구역까지 거리(m). 모양이 있으면 테두리까지(안이면 0), 없으면 중심점까지 */
+    fun distanceTo(lat: Double, lon: Double): Double {
+        val s = shape ?: return Geo.distanceM(lat, lon, this.lat, this.lon)
+        val n = s.size / 2
+        if (n < 3) return Geo.distanceM(lat, lon, this.lat, this.lon)
+        val kx = 111_320.0 * kotlin.math.cos(Math.toRadians(lat))
+        val ky = 110_540.0
+        var inside = false
+        var best = Double.MAX_VALUE
+        for (i in 0 until n) {
+            val j = (i + 1) % n
+            val x0 = (s[i * 2 + 1] - lon) * kx
+            val y0 = (s[i * 2] - lat) * ky
+            val x1 = (s[j * 2 + 1] - lon) * kx
+            val y1 = (s[j * 2] - lat) * ky
+            if ((y0 > 0) != (y1 > 0) && x0 + (x1 - x0) * (0 - y0) / (y1 - y0) > 0) inside = !inside
+            val dx = x1 - x0
+            val dy = y1 - y0
+            val len2 = dx * dx + dy * dy
+            val t = if (len2 < 1e-12) 0.0 else (-(x0 * dx + y0 * dy) / len2).coerceIn(0.0, 1.0)
+            best = minOf(best, kotlin.math.hypot(x0 + t * dx, y0 + t * dy))
+        }
+        return if (inside) 0.0 else best
+    }
+}
 
 enum class SpotKind(val label: String) {
     SAFE_DROP("어린이 안심승하차구역"),

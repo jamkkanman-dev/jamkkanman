@@ -444,6 +444,26 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
             leftMargin = ui.px(24)
             bottomMargin = ui.px(24)
         })
+
+        // 입체(3D) / 평면(2D) 보기 전환
+        val viewToggle = ui.chip(sizePx = 24).apply {
+            elevation = ui.pxf(3)
+            isClickable = true
+        }
+        fun styleToggle() {
+            viewToggle.text = if (map.tilted) "3D" else "2D"
+            if (map.tilted) ui.styleChip(viewToggle, Palette.SURFACE, Palette.BLUE)
+            else ui.styleChip(viewToggle, Palette.TEXT2, Palette.SURFACE)
+        }
+        styleToggle()
+        viewToggle.setOnClickListener {
+            map.tilted = !map.tilted
+            styleToggle()
+        }
+        card.addView(viewToggle, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.TOP or Gravity.END).apply {
+            topMargin = ui.px(24)
+            rightMargin = ui.px(24)
+        })
         return card
     }
 
