@@ -189,6 +189,23 @@ class StopEngine(
 
     // ------------------------------------------------------------------
 
+    /**
+     * 운전자가 직접 물었을 때(Gleo AI 음성 질문): 같은 자리여도 다시 확인하고, 금지구역이 아니어도 말로 답한다.
+     * 위치를 몰라 확인하지 못했으면 null.
+     */
+    fun checkNow(reason: String): CheckResult? {
+        val before = lastCheckedAtMs
+        session = null
+        stopMoment(reason)
+        if (lastCheckedAtMs == before) return null
+        val result = lastResult ?: return null
+        when {
+            !result.covered -> speak("이 지역은 아직 금지구역 데이터가 없어서 확인할 수 없어요.")
+            result.top == null && lastCreditWon == 0 -> speak("여기는 주정차 금지구역이 아니에요. 세워도 돼요.")
+        }
+        return result
+    }
+
     /** 시연용: 저장된 상태를 지우고 처음처럼 */
     fun resetSession() {
         session = null

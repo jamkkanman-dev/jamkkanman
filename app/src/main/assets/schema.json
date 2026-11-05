@@ -1,0 +1,47 @@
+{
+  "packageName": "dev.jamkkanman.app",
+  "appDescription": "A parking safety app that warns the driver when the car stops in a no-stopping zone and guides the driver to a nearby place where stopping is allowed.",
+  "invokeWord": "잠깐만",
+  "version": "0.1.0",
+  "actionCalls": [
+    {
+      "type": "function",
+      "function": {
+        "name": "CHECK_PARKING_HERE",
+        "description": "Check whether stopping or parking at the car's current location is prohibited, and tell the fine and how far to move.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        },
+        "component": "activity"
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "FIND_LEGAL_PARKING",
+        "description": "Find the nearest place where the car is allowed to stop and start route guidance to it.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        },
+        "component": "activity"
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "GET_SAVED_FINES",
+        "description": "Report how much in parking fines the driver avoided this month by moving the car after a warning.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        },
+        "component": "service"
+      }
+    }
+  ]
+}

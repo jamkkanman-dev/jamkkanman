@@ -52,9 +52,24 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Gleo AI 음성 요청 (assets/schema.json의 component="activity" 기능) -->
+            <intent-filter>
+                <action android:name="CHECK_PARKING_HERE" />
+                <action android:name="FIND_LEGAL_PARKING" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
             <meta-data
                 android:name="distractionOptimized"
                 android:value="true" />
         </activity>
+
+        <!-- Gleo AI 음성 요청 (assets/schema.json의 component="service" 기능: 화면 없이 답만) -->
+        <receiver
+            android:name=".car.GleoReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="GET_SAVED_FINES" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

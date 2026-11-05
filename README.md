@@ -14,6 +14,7 @@
 | 한 번만 음성 안내 | 같은 자리에서는 다시 말하지 않음. 운전 중에는 화면 대신 음성 | Pleos TextToSpeech SDK (기기 내 합성) |
 | 세울 곳 안내 | 가장 가까운 공영주차장을 보여 주고 버튼 한 번으로 길 안내 또는 경유지 추가 | Pleos NaviHelper SDK |
 | 도착 전 안내 | 목적지 앞이 금지구역이면 도착 700m 전에 미리 알리고 세울 곳을 경유지로 추가 | Pleos NaviHelper SDK |
+| 음성으로 묻기 | "여기 세워도 돼?", "근처에 세울 데 어디야?", "이번 달 과태료 얼마 아꼈어?"를 말로 물으면 답함 | Pleos Gleo AI 연동 (`assets/schema.json`) |
 | 이번 달 아낀 과태료 | 알림을 듣고 금지구역 밖으로 옮겨 세웠을 때만 더함 | 앱 내부 기록 |
 | 정차 수요 기록 | 운전자가 동의했을 때만, 정확한 위치 대신 약 50m 칸·시간대·요일만 차 안에 저장 (지자체 안심 승하차 구역 설계용) | 앱 내부 기록 |
 | 지도 | 직접 그리는 오프라인 지도. 입체(3D)·평면(2D) 전환, 내 차 주변 금지구역과 세울 곳 표시 | 국토교통부 표준노드링크 (+ 시연용 빌드는 행정안전부 도로명주소 도형) |
@@ -59,6 +60,28 @@
 | 비상등 | ① Android Automotive `HAZARD_LIGHTS_STATE` ② Pleos `TurnSignal` ③ Pleos `Safety` 경고등(Telltales) | 3rd party 앱에는 신호가 열려 있지 않음 (①은 속성 미노출, ②는 비상등 때 값이 바뀌지 않음, ③은 실시간 구독이 시스템 앱 전용 권한이고 조회도 거부됨) |
 
 비상등은 Pleos가 3rd party 앱에 신호를 열어 주면 바로 쓸 수 있도록 판단 코드를 남겨 두었습니다 (`car/VehicleWatcher.kt`, `car/CarGearSource.kt`).
+
+## Gleo AI 음성 연동
+
+[Pleos App Integration Guide](https://document.pleos.ai/docs/pleos-only/app-integration-guide/guide/deliver-schema)대로 `app/src/main/assets/schema.json`에 음성으로 부를 수 있는 기능 3개를 적었습니다 (가이드 상한 3개).
+
+| 기능 (schema 이름) | 방식 | 하는 일 | 이렇게 물으면 |
+|---|---|---|---|
+| `CHECK_PARKING_HERE` | activity | 지금 자리가 금지구역인지 다시 확인하고 과태료·옮길 거리·가까운 세울 곳을 음성으로 안내 | "잠깐만, 여기 세워도 돼?" |
+| `FIND_LEGAL_PARKING` | activity | 가장 가까운 공영주차장으로 길 안내 시작 (NaviHelper) | "근처에 세울 데 어디야?" |
+| `GET_SAVED_FINES` | service | 화면을 열지 않고 이번 달 아낀 과태료·알림 횟수를 돌려줌 | "이번 달 과태료 얼마 아꼈어?" |
+
+- 결과는 `ai.pleos.playground.intent.action.APP_ACTION_RESPONSE` 방송으로 돌려줍니다. 가이드대로 `message`는 영어 한 문장, `data`는 JSON 배열 문자열입니다 (`car/GleoBridge.kt`).
+- 앞의 두 기능은 앱이 한국어 음성으로 직접 답하므로 `mode: "silent"`로 Gleo가 겹쳐 말하지 않게 했습니다. `GET_SAVED_FINES`는 Gleo가 `data`를 보고 답합니다.
+- schema는 Pleos 검토·승인 뒤에 Gleo AI에서 쓸 수 있어, 에뮬레이터에서는 Gleo가 보내는 것과 같은 Intent를 adb로 보내 세 기능 모두 응답이 돌아오는 것을 확인했습니다.
+  ```
+  adb shell am start -a CHECK_PARKING_HERE -p dev.jamkkanman.app --es ACTION_PARAM '{}'
+  adb shell am start -a FIND_LEGAL_PARKING -p dev.jamkkanman.app --es ACTION_PARAM '{}'
+  adb shell am broadcast -a GET_SAVED_FINES -p dev.jamkkanman.app --es ACTION_PARAM '{}'
+  adb logcat -s Jamkkanman
+  ```
+  예: 학원가 버스정류장에서 `CHECK_PARKING_HERE` →
+  `{"functionName":"CHECK_PARKING_HERE","status":"success","message":"Stopping here is prohibited because the car is within 10 m of a bus stop, and the fine is 40,000 won.","mode":"silent","data":"[{\"stopAllowed\":false,\"zoneType\":\"bus stop\",\"distanceM\":3,\"fineWon\":40000,\"certain\":true,\"moveM\":8,\"parkingName\":\"도곡로421 공영주차장\",\"parkingDistanceM\":17}]"}`
 
 ## 지도
 

@@ -7,6 +7,7 @@ import ai.pleos.playground.vehicle.constant.area.TurnSignalValue
 import ai.pleos.playground.vehicle.constant.control.VehicleGear
 import android.Manifest
 import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Bundle
@@ -21,6 +22,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Switch
 import android.widget.TextView
+import dev.jamkkanman.app.car.GleoBridge
 import dev.jamkkanman.app.car.LocationHub
 import dev.jamkkanman.app.car.NaviWatcher
 import dev.jamkkanman.app.car.VehicleWatcher
@@ -33,6 +35,7 @@ import dev.jamkkanman.app.core.Voice
 import dev.jamkkanman.app.core.ZoneChecker
 import dev.jamkkanman.app.core.ZoneData
 import dev.jamkkanman.app.core.ZoneRepository
+import dev.jamkkanman.app.core.ZoneType
 import dev.jamkkanman.app.ui.Palette
 import dev.jamkkanman.app.ui.UiKit
 import dev.jamkkanman.app.ui.UiKit.Companion.MATCH
@@ -43,6 +46,9 @@ import dev.jamkkanman.app.core.RoadMap
 import dev.jamkkanman.app.ui.StopMapView
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * 잠깐만 메인 화면 (Pleos Connect 디자인 가이드 Light 테마·타이포그래피 기준).
@@ -141,6 +147,95 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
         requestLocationPermission()
         handler.post(ticker)
         render()
+        // Gleo AI가 앱을 처음 띄우며 부른 경우: 위치·차량 연결이 잡힐 시간을 조금 준다
+        if (GleoBridge.isActivityAction(intent?.action)) {
+            val first = intent
+            handler.postDelayed({ handleGleo(first) }, GLEO_COLD_START_MS)
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleGleo(intent)
+    }
+
+    // ------------------------------------------------------------------ Gleo AI 음성 요청
+
+    private fun handleGleo(request: Intent?) {
+        val action = request?.action ?: return
+        if (!GleoBridge.isActivityAction(action)) return
+        // 화면을 다시 만들 때 같은 요청을 또 처리하지 않도록 지운다
+        request.action = Intent.ACTION_MAIN
+        log("Gleo AI 요청: $action")
+        when (action) {
+            GleoBridge.CHECK_PARKING_HERE -> gleoCheckHere()
+            GleoBridge.FIND_LEGAL_PARKING -> gleoFindParking()
+        }
+    }
+
+    /**
+     * "여기 세워도 돼?" — 앱이 직접 한국어 음성으로 답하고(StopEngine.checkNow), Gleo에는 영어 한 문장 + data를 silent로 돌려준다.
+     */
+    private fun gleoCheckHere() {
+        val fn = GleoBridge.CHECK_PARKING_HERE
+        val silent = GleoBridge.MODE_SILENT
+        val result = engine.checkNow("음성 질문")
+        if (result == null) {
+            voice.say("지금 위치를 아직 찾지 못했어요. 잠시 뒤에 다시 물어봐 주세요.")
+            GleoBridge.respond(this, fn, GleoBridge.FAIL, "The current location is not available yet.", mode = silent)
+            return
+        }
+        if (!result.covered) {
+            GleoBridge.respond(this, fn, GleoBridge.FAIL, "No-stopping zone data is not available for this area yet.", mode = silent)
+            return
+        }
+        val top = result.top
+        val spot = result.spot
+        val item = JSONObject().put("stopAllowed", top == null)
+        val message = if (top != null) {
+            val type = top.zone.type
+            val fine = type.fineAt(result.hour)
+            item.put("zoneType", GleoBridge.english(type)).put("distanceM", top.distanceM.roundToInt())
+                .put("fineWon", fine).put("certain", top.certain)
+            if (top.certain && top.exitM in 0.5..12.0) item.put("moveM", (top.exitM + 1.0).roundToInt())
+            val where = if (type == ZoneType.SCHOOL_ZONE) "inside a school zone" else "within ${type.radiusM.roundToInt()} m of a ${GleoBridge.english(type)}"
+            "Stopping here is prohibited because the car is $where, and the fine is ${GleoBridge.wonText(fine)}."
+        } else {
+            "Stopping here is allowed because there is no no-stopping zone nearby."
+        }
+        spot?.let { item.put("parkingName", it.spot.name).put("parkingDistanceM", it.distanceM.roundToInt()) }
+        GleoBridge.respond(this, fn, GleoBridge.SUCCESS, message, JSONArray().put(item), silent)
+    }
+
+    /** "근처에 세울 데 어디야?" — 가장 가까운 세울 곳으로 길 안내를 시작하고 앱이 직접 말한다. */
+    private fun gleoFindParking() {
+        val fn = GleoBridge.FIND_LEGAL_PARKING
+        val silent = GleoBridge.MODE_SILENT
+        val fix = locations.current()
+        if (fix == null) {
+            voice.say("지금 위치를 아직 찾지 못했어요.")
+            GleoBridge.respond(this, fn, GleoBridge.FAIL, "The current location is not available yet.", mode = silent)
+            return
+        }
+        val hint = checker.nearestSpot(fix.lat, fix.lon)
+        if (hint == null) {
+            voice.say("600미터 안에 세울 수 있는 곳이 없어요.")
+            GleoBridge.respond(this, fn, GleoBridge.FAIL, "There is no legal place to stop within 600 m.", mode = silent)
+            return
+        }
+        val started = guideTo(hint.spot)
+        val name = Speech.spokenName(hint.spot.name)
+        val meters = hint.distanceM.roundToInt()
+        voice.say(
+            if (started) "${Speech.josa(name, "으로", "로")} 안내할게요. ${Speech.meters(hint.distanceM)} 거리예요."
+            else "${Speech.josa(name, "이", "가")} 가장 가까워요. ${Speech.meters(hint.distanceM)} 거리인데 길 안내는 시작하지 못했어요."
+        )
+        val message = if (started) "Started route guidance to $name, $meters m away."
+        else "The nearest legal place to stop is $name, $meters m away, but route guidance could not be started."
+        val item = JSONObject().put("parkingName", hint.spot.name).put("distanceM", meters)
+            .put("guidanceStarted", started)
+        GleoBridge.respond(this, fn, if (started) GleoBridge.SUCCESS else GleoBridge.FAIL, message, JSONArray().put(item), silent)
     }
 
     override fun onDestroy() {
@@ -675,6 +770,7 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
     companion object {
         private const val TAG = "Jamkkanman"
         private const val LOG_KEEP = 12
+        private const val GLEO_COLD_START_MS = 2_500L
         private const val REQ_LOCATION = 2001
     }
 }
