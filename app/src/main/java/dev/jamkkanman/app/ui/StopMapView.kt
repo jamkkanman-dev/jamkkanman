@@ -463,28 +463,43 @@ class StopMapView(context: Context, private val unit: Float) : View(context) {
             stroke.pathEffect = null
         }
 
-        // 모양이 있는 금지구역(횡단보도): 실제 모양과 그 둘레 반경(10m) 띠. 내 차 주변과 지금 걸린 곳만
+        // 교차로 모퉁이: 교차로 자체를 칠하면 지도가 온통 빨개지므로 테두리 둘레 5m 띠만 옅게. 횡단보도보다 먼저(아래) 그린다
         for (z in zones) {
+            if (z.type != ZoneType.CORNER) continue
             val s = z.shape ?: continue
-            if (z.type == ZoneType.SCHOOL_ZONE) continue
             val (zx, zy) = meters(z.lat, z.lon) ?: continue
             val hl = z.id == highlightId
             if (!hl && hypot(zx - camX, zy - camY) > NEAR_M) continue
             val k = focal / project(zx, zy, 0f)
             val cx = pt[0]
             val cy = pt[1]
-            tmpPath.rewind()
-            var first = true
-            var i = 0
-            while (i + 1 < s.size) {
-                val m = meters(s[i], s[i + 1])
-                i += 2
-                if (m == null) continue
-                project(m.first, m.second, 0f)
-                if (first) tmpPath.moveTo(pt[0], pt[1]) else tmpPath.lineTo(pt[0], pt[1])
-                first = false
+            shapePath(s)
+            band.strokeWidth = z.radiusM.toFloat() * 2f * k
+            band.color = withAlpha(Palette.RED, if (hl) 0x30 else 0x16)
+            canvas.drawPath(tmpPath, band)
+            if (hl) {
+                fill.color = withAlpha(Palette.RED, 0x14)
+                canvas.drawPath(tmpPath, fill)
             }
-            tmpPath.close()
+            stroke.pathEffect = dash
+            stroke.strokeWidth = u(if (hl) 2.5f else 1.5f)
+            stroke.color = withAlpha(Palette.RED, if (hl) 0xE0 else 0x70)
+            canvas.drawPath(tmpPath, stroke)
+            stroke.pathEffect = null
+            if (hl) drawTag(canvas, cx, cy - u(30f), "${z.type.place} ${z.type.range}", Palette.RED)
+        }
+
+        // 모양이 있는 금지구역(횡단보도): 실제 모양과 그 둘레 반경(10m) 띠. 내 차 주변과 지금 걸린 곳만
+        for (z in zones) {
+            val s = z.shape ?: continue
+            if (z.type == ZoneType.SCHOOL_ZONE || z.type == ZoneType.CORNER) continue
+            val (zx, zy) = meters(z.lat, z.lon) ?: continue
+            val hl = z.id == highlightId
+            if (!hl && hypot(zx - camX, zy - camY) > NEAR_M) continue
+            val k = focal / project(zx, zy, 0f)
+            val cx = pt[0]
+            val cy = pt[1]
+            shapePath(s)
             band.strokeWidth = z.radiusM.toFloat() * 2f * k
             band.color = withAlpha(Palette.RED, if (hl) 0x26 else 0x14)
             canvas.drawPath(tmpPath, band)
@@ -518,6 +533,22 @@ class StopMapView(context: Context, private val unit: Float) : View(context) {
             canvas.drawCircle(px, py, u(if (hl) 8f else 5f), fill)
             if (hl) drawTag(canvas, px, py - ry - u(14f), "${z.type.place} ${z.type.range}", Palette.RED)
         }
+    }
+
+    /** 위도·경도 목록(shape)을 땅 위에 투영해 tmpPath에 담는다 */
+    private fun shapePath(s: DoubleArray) {
+        tmpPath.rewind()
+        var first = true
+        var i = 0
+        while (i + 1 < s.size) {
+            val m = meters(s[i], s[i + 1])
+            i += 2
+            if (m == null) continue
+            project(m.first, m.second, 0f)
+            if (first) tmpPath.moveTo(pt[0], pt[1]) else tmpPath.lineTo(pt[0], pt[1])
+            first = false
+        }
+        tmpPath.close()
     }
 
     // ------------------------------------------------------------------ 도로 이름
