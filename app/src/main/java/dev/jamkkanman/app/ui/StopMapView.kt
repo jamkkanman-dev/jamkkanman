@@ -48,6 +48,15 @@ class StopMapView(context: Context, private val unit: Float) : View(context) {
     private var spots: List<SafeSpot> = emptyList()
     private var cctvs: List<Cctv> = emptyList()
 
+    /** 지도 가운데에 띄울 안내 (데이터가 없는 지역일 때). null이면 없음 */
+    var notice: String? = null
+        set(value) {
+            if (field != value) {
+                field = value
+                invalidate()
+            }
+        }
+
     private var center: Fix? = null
     private var heading = 0f
     private var highlightId: String? = null
@@ -237,6 +246,7 @@ class StopMapView(context: Context, private val unit: Float) : View(context) {
         }
 
         drawCar(canvas, anchorX, anchorY, if (tilted) 0f else heading)
+        notice?.let { drawTag(canvas, width / 2f, height * 0.38f, it, Palette.TEXT2) }
         drawCredit(canvas)
         if (!tilted) drawScaleBar(canvas, scale)
     }

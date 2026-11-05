@@ -77,6 +77,8 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
     private var naviCaution: String? = null
     private var lastLog = ""
     private var demoOpen = false
+    /** 확인 범위 밖에서 앱을 켰을 때 시연 줄을 한 번만 자동으로 열었는지 */
+    private var demoAutoOpened = false
     /** 내비가 알려 준 진행 방향(도, 북쪽 0) */
     private var heading = 0f
     private var built = false
@@ -368,7 +370,28 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
         val reason = engine.lastReason
         val top = result?.top
         val mood: StopMapView.Mood
+        val now = locations.current()
+        val outsideNow = now != null && !checker.covers(now.lat, now.lon)
+        if (outsideNow && !demoAutoOpened) {
+            demoAutoOpened = true
+            if (!demoOpen) {
+                demoOpen = true
+                demoStrip.visibility = View.VISIBLE
+                ui.styleChip(demoToggle, Palette.SURFACE, Palette.TEXT)
+            }
+        }
+        map.notice = if (outsideNow && (result == null || !result.covered)) "이 지역은 데이터가 없어요 · ${data.region}만 들어 있어요" else null
         when {
+            result == null && outsideNow -> {
+                // 데이터가 없는 곳에서 켠 경우 (에뮬레이터 기본 위치 등): 빈 지도 대신 무엇을 하면 되는지 알려 준다
+                mood = StopMapView.Mood.NEUTRAL
+                stateChip.text = "확인 범위 밖"
+                ui.styleChip(stateChip, Palette.TEXT2, Palette.SURFACE_HIGH)
+                reasonText.text = ""
+                titleText.text = "지금 위치는 아직 확인할 수 없어요"
+                titleText.setTextColor(Palette.TEXT)
+                detailText.text = "금지구역 데이터는 ${data.region}만 들어 있어요.\n아래 시연 줄에서 ${data.demo.firstOrNull()?.label?.let { "‘$it’ 같은 " } ?: ""}지점을 눌러 보세요."
+            }
             result == null -> {
                 mood = StopMapView.Mood.NEUTRAL
                 stateChip.text = "대기 중"
@@ -398,7 +421,7 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
                 reasonText.text = "${reason ?: "정차"} · ${checkedTime()}"
                 titleText.text = "이 지역은 아직 확인할 수 없어요"
                 titleText.setTextColor(Palette.TEXT)
-                detailText.text = "지금은 ${data.region} 금지구역 데이터만 들어 있어요.\n시연 버튼으로 대치동 지점을 골라 보세요."
+                detailText.text = "지금은 ${data.region} 금지구역 데이터만 들어 있어요.\n오른쪽 위 시연 → ${data.demo.firstOrNull()?.label?.let { "‘$it’ 같은 " } ?: ""}지점을 눌러 보세요."
             }
             result.risk?.busy == true && engine.lastCreditWon == 0 -> {
                 // 금지구역은 아니지만 단속 CCTV가 있거나 단속이 잦은 곳: 노란 선 같은 지정 구간은 데이터에 없어 확인을 권한다
@@ -429,10 +452,11 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
         // 세울 곳: 확인 결과가 있으면 그 기준, 없으면 지금 위치 기준
         val fix = result?.fix ?: locations.current()
         val spot = result?.spot ?: fix?.let { checker.nearestSpot(it.lat, it.lon) }
+        val spotOutside = fix != null && !checker.covers(fix.lat, fix.lon)
         if (spot == null) {
             spotLabel.text = "세울 수 있는 곳"
-            spotName.text = "600m 안에 없어요"
-            spotDetail.text = "공공데이터 기준 · ${data.region}"
+            spotName.text = if (spotOutside) "이 지역은 아직 찾을 수 없어요" else "600m 안에 없어요"
+            spotDetail.text = if (spotOutside) "세울 곳 데이터도 ${data.region}만 들어 있어요" else "공공데이터 기준 · ${data.region}"
             ui.setButtonEnabled(guideButton, false)
         } else {
             spotLabel.text = if (top != null) "대신 세울 수 있는 곳" else "가까운 세울 수 있는 곳"
