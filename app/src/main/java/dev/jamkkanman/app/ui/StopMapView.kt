@@ -9,6 +9,7 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.view.View
 import dev.jamkkanman.app.core.BaseMap
+import dev.jamkkanman.app.core.Cctv
 import dev.jamkkanman.app.core.Fix
 import dev.jamkkanman.app.core.RoadMap
 import dev.jamkkanman.app.core.SafeSpot
@@ -45,6 +46,7 @@ class StopMapView(context: Context, private val unit: Float) : View(context) {
     private var base: BaseMap? = null
     private var zones: List<Zone> = emptyList()
     private var spots: List<SafeSpot> = emptyList()
+    private var cctvs: List<Cctv> = emptyList()
 
     private var center: Fix? = null
     private var heading = 0f
@@ -152,10 +154,11 @@ class StopMapView(context: Context, private val unit: Float) : View(context) {
     private val wallPaths = Array(3) { Path() }
     private val rect = RectF()
 
-    fun setData(roadMap: RoadMap?, zoneList: List<Zone>, spotList: List<SafeSpot>) {
+    fun setData(roadMap: RoadMap?, zoneList: List<Zone>, spotList: List<SafeSpot>, cctvList: List<Cctv> = emptyList()) {
         roads = roadMap
         zones = zoneList
         spots = spotList
+        cctvs = cctvList
         invalidate()
     }
 
@@ -206,6 +209,7 @@ class StopMapView(context: Context, private val unit: Float) : View(context) {
         }
         drawRoadNames(canvas, bm)
         drawZones(canvas)
+        drawCctvs(canvas)
 
         // 내 차 → 세울 곳 점선
         target?.let { t ->
@@ -532,6 +536,25 @@ class StopMapView(context: Context, private val unit: Float) : View(context) {
             fill.color = Palette.RED
             canvas.drawCircle(px, py, u(if (hl) 8f else 5f), fill)
             if (hl) drawTag(canvas, px, py - ry - u(14f), "${z.type.place} ${z.type.range}", Palette.RED)
+        }
+    }
+
+    /** 고정형 단속 CCTV: 내 차 주변만 작은 카메라 표시 (어두운 네모 + 흰 렌즈) */
+    private fun drawCctvs(canvas: Canvas) {
+        for (c in cctvs) {
+            val (cx, cy) = meters(c.lat, c.lon) ?: continue
+            if (hypot(cx - camX, cy - camY) > NEAR_M * 1.5f) continue
+            project(cx, cy, 0f)
+            val x = pt[0]
+            val y = pt[1]
+            val h = u(13f)
+            rect.set(x - h, y - h, x + h, y + h)
+            fill.color = Palette.FILLED
+            canvas.drawRoundRect(rect, u(6f), u(6f), fill)
+            fill.color = Palette.SURFACE
+            canvas.drawCircle(x, y, u(6f), fill)
+            fill.color = Palette.FILLED
+            canvas.drawCircle(x, y, u(3f), fill)
         }
     }
 

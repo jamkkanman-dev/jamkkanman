@@ -201,8 +201,13 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
             if (top.certain && top.exitM in 0.5..12.0) item.put("moveM", (top.exitM + 1.0).roundToInt())
             val where = if (type == ZoneType.SCHOOL_ZONE) "inside a school zone" else "within ${type.radiusM.roundToInt()} m of a ${GleoBridge.english(type)}"
             "Stopping here is prohibited because the car is $where, and the fine is ${GleoBridge.wonText(fine)}."
+        } else if (result.risk?.busy == true) {
+            "Stopping here is not prohibited, but parking enforcement is frequent nearby, so the driver should check for yellow lines."
         } else {
             "Stopping here is allowed because there is no no-stopping zone nearby."
+        }
+        result.risk?.let { r ->
+            item.put("enforcementCctvNearby", r.cctv != null).put("nearbyEnforcementCount", r.recent)
         }
         spot?.let { item.put("parkingName", it.spot.name).put("parkingDistanceM", it.distanceM.roundToInt()) }
         GleoBridge.respond(this, fn, GleoBridge.SUCCESS, message, JSONArray().put(item), silent)
@@ -382,6 +387,7 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
                 titleText.setTextColor(if (top.certain) Palette.RED else Palette.TEXT)
                 val lines = mutableListOf("${top.zone.type.risk}이에요 · 과태료 ${Speech.won(top.zone.type.fineAt(result.hour))}")
                 if (top.certain && top.exitM in 0.5..12.0) lines += "약 ${Speech.metersShort(top.exitM + 1.0)}만 옮기면 범위 밖이에요"
+                result.risk?.let { r -> Speech.riskLine(r)?.let { lines += it } }
                 detailText.text = lines.joinToString("\n")
             }
             !result.covered -> {
@@ -394,6 +400,17 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
                 titleText.setTextColor(Palette.TEXT)
                 detailText.text = "지금은 ${data.region} 금지구역 데이터만 들어 있어요.\n시연 버튼으로 대치동 지점을 골라 보세요."
             }
+            result.risk?.busy == true && engine.lastCreditWon == 0 -> {
+                // 금지구역은 아니지만 단속 CCTV가 있거나 단속이 잦은 곳: 노란 선 같은 지정 구간은 데이터에 없어 확인을 권한다
+                val risk = requireNotNull(result.risk)
+                mood = StopMapView.Mood.CLEAR
+                stateChip.text = "단속 주의"
+                ui.styleChip(stateChip, Palette.SURFACE, Palette.ORANGE)
+                reasonText.text = "${reason ?: "정차"} · ${checkedTime()}"
+                titleText.text = if (risk.cctv != null) "금지구역은 아니지만 단속 카메라가 있어요" else "금지구역은 아니지만 단속이 잦은 곳이에요"
+                titleText.setTextColor(Palette.TEXT)
+                detailText.text = listOfNotNull(Speech.riskLine(risk), "노란 선이 있으면 세우지 마세요").joinToString("\n")
+            }
             else -> {
                 mood = StopMapView.Mood.CLEAR
                 stateChip.text = "정차 가능"
@@ -402,7 +419,7 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
                 titleText.text = "여기는 세워도 돼요"
                 titleText.setTextColor(Palette.TEXT)
                 detailText.text = if (engine.lastCreditWon > 0) "알림을 듣고 옮겨 세워서 과태료 ${Speech.won(engine.lastCreditWon)}을 아꼈어요."
-                else "주변 주정차 금지구역 밖이에요."
+                else listOfNotNull("주변 주정차 금지구역 밖이에요.", result.risk?.let { Speech.riskLine(it) }).joinToString("\n")
             }
         }
 
@@ -506,7 +523,7 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
             elevation = ui.pxf(6)
         }
         map = StopMapView(this, ui.scale).apply {
-            setData(RoadMap.load(this@MainActivity), data.zones, data.spots)
+            setData(RoadMap.load(this@MainActivity), data.zones, data.spots, data.cctvs)
         }
         // 건물·실폭도로 배경은 파일이 커서 화면 스레드 밖에서 읽는다
         val appContext = applicationContext
@@ -532,7 +549,7 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
             setPadding(ui.px(22), ui.px(12), ui.px(22), ui.px(12))
             elevation = ui.pxf(3)
         }
-        for ((color, name) in listOf(Palette.RED to "금지구역", Palette.ORANGE to "어린이보호구역", Palette.GREEN to "세울 곳")) {
+        for ((color, name) in listOf(Palette.RED to "금지구역", Palette.ORANGE to "어린이보호구역", Palette.GREEN to "세울 곳", Palette.FILLED to "단속 CCTV")) {
             legend.addView(View(this).apply { background = ui.rounded(color, 100) }, ui.lp(ui.px(16), ui.px(16), start = if (name == "금지구역") 0 else 18))
             legend.addView(ui.text(20, Palette.TEXT2, bold = true, value = name), ui.lp(WRAP, WRAP, start = 8))
         }

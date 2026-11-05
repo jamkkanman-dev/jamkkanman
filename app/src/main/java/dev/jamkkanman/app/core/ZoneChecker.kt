@@ -14,6 +14,22 @@ data class ZoneHit(
 
 data class SpotHint(val spot: SafeSpot, val distanceM: Double)
 
+/**
+ * 이 자리의 단속 위험: 가까운 고정형 단속 CCTV와 이 근처(반경 50m) 실제 단속 건수.
+ * 금지구역 판단과는 따로, 경고를 더 분명하게 하거나 '금지구역은 아니지만 단속이 잦은 곳'을 알리는 데 쓴다.
+ */
+data class Risk(
+    val cctv: Cctv?,
+    val cctvM: Double,
+    /** 반경 50m 안 단속 건수 */
+    val recent: Int,
+    /** 단속 기록 기간 (예: "2025년 10~12월") */
+    val period: String,
+) {
+    /** 단속 CCTV가 가깝거나 단속이 잦은 곳 */
+    val busy: Boolean get() = cctv != null || recent >= ZoneChecker.BUSY_COUNT
+}
+
 data class CheckResult(
     val fix: Fix,
     val hits: List<ZoneHit>,
@@ -21,6 +37,7 @@ data class CheckResult(
     val hour: Int,
     /** false면 금지구역 데이터가 없는 지역이라 '세워도 된다'고 말할 수 없다 */
     val covered: Boolean = true,
+    val risk: Risk? = null,
 ) {
     val top: ZoneHit? get() = hits.firstOrNull()
     val isClear: Boolean get() = hits.isEmpty() && covered
@@ -57,7 +74,22 @@ class ZoneChecker(val data: ZoneData) {
                 .thenByDescending { it.zone.type.fineAt(hour) }
                 .thenBy { it.distanceM }
         )
-        return CheckResult(fix, hits, nearestSpot(fix.lat, fix.lon), hour)
+        return CheckResult(fix, hits, nearestSpot(fix.lat, fix.lon), hour, risk = risk(fix.lat, fix.lon))
+    }
+
+    /** 이 자리의 단속 위험 (CCTV·단속 기록 데이터가 없으면 null) */
+    fun risk(lat: Double, lon: Double): Risk? {
+        if (data.cctvs.isEmpty() && data.enforcement.isEmpty()) return null
+        val near = data.cctvs
+            .map { it to Geo.distanceM(lat, lon, it.lat, it.lon) }
+            .filter { it.second <= CCTV_NEAR_M }
+            .minByOrNull { it.second }
+        var recent = 0
+        for (c in data.enforcement) {
+            if (Math.abs(c.lat - lat) > 0.0008 || Math.abs(c.lon - lon) > 0.001) continue
+            if (Geo.distanceM(lat, lon, c.lat, c.lon) <= RECENT_NEAR_M) recent += c.count
+        }
+        return Risk(near?.first, near?.second ?: Double.MAX_VALUE, recent, data.enforcementPeriod)
     }
 
     /** 목적지처럼 '앞으로 세울 자리' 주변의 금지구역 (반경 + 여유) */
@@ -79,6 +111,12 @@ class ZoneChecker(val data: ZoneData) {
         private const val COVER_MARGIN_DEG = 0.003
         /** 중심점이 반경보다 이만큼 더 멀면 모양을 볼 필요도 없다 (가장 긴 횡단보도의 절반보다 넉넉히) */
         private const val FAR_SKIP_M = 60.0
+        /** 이 거리 안의 고정형 단속 CCTV를 '가까이 있다'고 본다 */
+        const val CCTV_NEAR_M = 50.0
+        /** 단속 건수를 세는 반경 */
+        const val RECENT_NEAR_M = 50.0
+        /** 반경 50m 안 단속이 석 달에 이만큼 이상이면 '단속이 잦은 곳' (대치동 주변 상위 약 25%) */
+        const val BUSY_COUNT = 30
 
         /** 한국 시각 기준 (기기 시간대와 무관) */
         fun currentHour(): Int = KoreaTime.hour()

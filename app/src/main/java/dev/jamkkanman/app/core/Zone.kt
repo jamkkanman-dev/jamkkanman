@@ -97,6 +97,20 @@ data class DemoPlace(
     val lon: Double,
 )
 
+/** 고정형 불법주정차 단속 CCTV (서울시 강남구 불법주정차 위반 단속 CCTV 위치정보) */
+data class Cctv(
+    val name: String,
+    val lat: Double,
+    val lon: Double,
+)
+
+/** 최근 실제 단속 기록을 25m 칸으로 모은 것 (서울시 불법주정차 단속 정보). 칸 가운데 위치와 건수 */
+data class EnforcementCell(
+    val lat: Double,
+    val lon: Double,
+    val count: Int,
+)
+
 data class ZoneData(
     val region: String,
     val isSample: Boolean,
@@ -104,6 +118,10 @@ data class ZoneData(
     val zones: List<Zone>,
     val spots: List<SafeSpot>,
     val demo: List<DemoPlace>,
+    val cctvs: List<Cctv> = emptyList(),
+    val enforcement: List<EnforcementCell> = emptyList(),
+    /** 단속 기록 기간 (화면 표시용, 예: "최근 3개월") */
+    val enforcementPeriod: String = "",
 ) {
     companion object {
         val EMPTY = ZoneData("데이터 없음", true, emptyList(), emptyList(), emptyList(), emptyList())

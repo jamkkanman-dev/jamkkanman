@@ -20,11 +20,12 @@ object Speech {
     /** 음성으로 읽을 이름: 괄호 안 설명은 빼고 읽는다 */
     fun spokenName(name: String): String = name.replace(Regex("\\s*\\([^)]*\\)"), "").trim()
 
-    fun warning(hit: ZoneHit, spot: SpotHint?, hour: Int): String {
+    fun warning(hit: ZoneHit, spot: SpotHint?, hour: Int, risk: Risk? = null): String {
         val type = hit.zone.type
         val sb = StringBuilder()
         sb.append(if (hit.certain) "${type.spoken}이에요. " else "${type.spoken}일 수 있어요. ")
         sb.append("${type.risk}이고, 과태료는 ${won(type.fineAt(hour))}이에요. ")
+        if (risk?.cctv != null) sb.append("단속 카메라도 있는 곳이에요. ")
         if (hit.certain && hit.exitM in 0.5..12.0) {
             sb.append("약 ${meters(hit.exitM + 1.0)}만 옮기면 범위 밖이에요. ")
         }
@@ -35,6 +36,20 @@ object Speech {
     }
 
     fun moved(fine: Int): String = "여기는 세워도 돼요. 과태료 ${won(fine)} 아꼈어요."
+
+    /** 금지구역은 아니지만 단속 카메라가 있거나 단속이 잦은 곳 (노란 선 같은 지정 금지구간은 데이터에 없다) */
+    fun busyHere(risk: Risk): String {
+        val what = if (risk.cctv != null) "단속 카메라가 있는 곳" else "단속이 잦은 곳"
+        return "주정차 금지구역은 아니지만 ${what}이에요. 노란 선이 있는지 확인해 주세요."
+    }
+
+    /** 화면용 한 줄: "단속 CCTV 34m · 2025년 10~12월 이 근처 단속 158건" */
+    fun riskLine(risk: Risk): String? {
+        val parts = mutableListOf<String>()
+        if (risk.cctv != null) parts += "단속 CCTV ${metersShort(risk.cctvM)}"
+        if (risk.recent > 0) parts += "${risk.period.ifBlank { "최근" }} 이 근처 단속 ${"%,d".format(risk.recent)}건"
+        return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
+    }
 
     fun beforeArrival(hit: ZoneHit, spot: SpotHint?, waypointAdded: Boolean): String {
         val sb = StringBuilder("목적지 앞은 ${hit.zone.type.spoken}이에요. ")

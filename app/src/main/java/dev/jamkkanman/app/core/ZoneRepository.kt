@@ -46,6 +46,17 @@ object ZoneRepository {
             DemoPlace(o.getString("label"), o.getDouble("lat"), o.getDouble("lon"))
         }
         val sources = meta.optJSONArray("sources").strings()
+        val cctvs = root.optJSONArray("cctv").objects().map { o ->
+            Cctv(o.optString("name", "단속 CCTV"), o.getDouble("lat"), o.getDouble("lon"))
+        }
+        // 단속 기록: {"label": "최근 3개월", "cells": [[위도, 경도, 건수], ...]}
+        val enf = root.optJSONObject("enforcement")
+        val cells = enf?.optJSONArray("cells")?.let { arr ->
+            (0 until arr.length()).mapNotNull { i ->
+                val c = arr.optJSONArray(i) ?: return@mapNotNull null
+                EnforcementCell(c.getDouble(0), c.getDouble(1), c.getInt(2))
+            }
+        } ?: emptyList()
         return ZoneData(
             region = meta.optString("region", "알 수 없음"),
             isSample = meta.optBoolean("sample", false),
@@ -53,6 +64,9 @@ object ZoneRepository {
             zones = zones,
             spots = spots,
             demo = demo,
+            cctvs = cctvs,
+            enforcement = cells,
+            enforcementPeriod = enf?.optString("label").orEmpty(),
         )
     }
 

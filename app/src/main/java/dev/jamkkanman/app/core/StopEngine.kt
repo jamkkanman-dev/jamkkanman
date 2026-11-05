@@ -133,7 +133,7 @@ class StopEngine(
         val moved = settlePending(result, fix, now)
         val top = result.top
         if (top != null) {
-            val text = Speech.warning(top, result.spot, result.hour)
+            val text = Speech.warning(top, result.spot, result.hour, result.risk)
             speak(text)
             ledger.recordWarning()
             ledger.appendDemand("warn", top.zone.type, fix.lat, fix.lon)
@@ -142,8 +142,13 @@ class StopEngine(
         } else if (!result.covered) {
             log("$reason: 금지구역 데이터가 없는 지역이라 확인하지 않음")
         } else {
-            if (moved != null) speak(Speech.moved(moved))
-            log("$reason: 금지구역 아님${if (moved != null) " · 옮겨 세움 ${Speech.won(moved)}" else ""}")
+            val risk = result.risk
+            when {
+                moved != null -> speak(Speech.moved(moved))
+                risk != null && risk.busy -> speak(Speech.busyHere(risk))
+            }
+            log("$reason: 금지구역 아님${if (moved != null) " · 옮겨 세움 ${Speech.won(moved)}" else ""}" +
+                (risk?.let { r -> Speech.riskLine(r)?.let { " · $it" } } ?: ""))
         }
         onChange()
     }
@@ -201,7 +206,9 @@ class StopEngine(
         val result = lastResult ?: return null
         when {
             !result.covered -> speak("이 지역은 아직 금지구역 데이터가 없어서 확인할 수 없어요.")
-            result.top == null && lastCreditWon == 0 -> speak("여기는 주정차 금지구역이 아니에요. 세워도 돼요.")
+            // 단속이 잦은 곳이면 stopMoment가 이미 그 안내를 했다
+            result.top == null && lastCreditWon == 0 && result.risk?.busy != true ->
+                speak("여기는 주정차 금지구역이 아니에요. 세워도 돼요.")
         }
         return result
     }
