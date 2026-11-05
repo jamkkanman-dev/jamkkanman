@@ -204,7 +204,7 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
         } else if (result.risk?.busy == true) {
             "Stopping here is not prohibited, but parking enforcement is frequent nearby, so the driver should check for yellow lines."
         } else {
-            "Stopping here is allowed because there is no no-stopping zone nearby."
+            "There is no no-stopping zone near the car's current location."
         }
         result.risk?.let { r ->
             item.put("enforcementCctvNearby", r.cctv != null).put("nearbyEnforcementCount", r.recent)
@@ -407,19 +407,22 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
                 stateChip.text = "단속 주의"
                 ui.styleChip(stateChip, Palette.SURFACE, Palette.ORANGE)
                 reasonText.text = "${reason ?: "정차"} · ${checkedTime()}"
-                titleText.text = if (risk.cctv != null) "금지구역은 아니지만 단속 카메라가 있어요" else "금지구역은 아니지만 단속이 잦은 곳이에요"
+                titleText.text = if (risk.cctv != null) "단속 카메라가 있는 곳이에요" else "단속이 잦은 곳이에요"
                 titleText.setTextColor(Palette.TEXT)
-                detailText.text = listOfNotNull(Speech.riskLine(risk), "노란 선이 있으면 세우지 마세요").joinToString("\n")
+                detailText.text = listOfNotNull("주정차 금지구역은 아니에요", Speech.riskLine(risk), "노란 선이 있으면 세우지 마세요")
+                    .joinToString("\n")
             }
             else -> {
+                // '세워도 된다'고 판정하지 않는다: 노란 선 같은 지정 구간은 데이터에 없어, 확인한 금지구역 밖이라는 사실만 알린다
                 mood = StopMapView.Mood.CLEAR
-                stateChip.text = "정차 가능"
+                stateChip.text = "금지구역 밖"
                 ui.styleChip(stateChip, Palette.SURFACE, Palette.GREEN)
                 reasonText.text = "${reason ?: "정차"} · ${checkedTime()}"
-                titleText.text = "여기는 세워도 돼요"
+                titleText.text = if (engine.lastCreditWon > 0) "금지구역 밖으로 옮겼어요" else "주변에 주정차 금지구역이 없어요"
                 titleText.setTextColor(Palette.TEXT)
                 detailText.text = if (engine.lastCreditWon > 0) "알림을 듣고 옮겨 세워서 과태료 ${Speech.won(engine.lastCreditWon)}을 아꼈어요."
-                else listOfNotNull("주변 주정차 금지구역 밖이에요.", result.risk?.let { Speech.riskLine(it) }).joinToString("\n")
+                else listOfNotNull("소화전·교차로 모퉁이·버스정류장·횡단보도·어린이보호구역 기준", result.risk?.let { Speech.riskLine(it) })
+                    .joinToString("\n")
             }
         }
 

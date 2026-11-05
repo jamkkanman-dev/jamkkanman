@@ -35,7 +35,7 @@ object Speech {
         return sb.toString().trim()
     }
 
-    fun moved(fine: Int): String = "여기는 세워도 돼요. 과태료 ${won(fine)} 아꼈어요."
+    fun moved(fine: Int): String = "금지구역 밖으로 옮겼어요. 과태료 ${won(fine)} 아꼈어요."
 
     /** 금지구역은 아니지만 단속 카메라가 있거나 단속이 잦은 곳 (노란 선 같은 지정 금지구간은 데이터에 없다) */
     fun busyHere(risk: Risk): String {

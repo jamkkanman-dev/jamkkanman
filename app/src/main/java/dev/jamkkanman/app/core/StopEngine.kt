@@ -208,7 +208,7 @@ class StopEngine(
             !result.covered -> speak("이 지역은 아직 금지구역 데이터가 없어서 확인할 수 없어요.")
             // 단속이 잦은 곳이면 stopMoment가 이미 그 안내를 했다
             result.top == null && lastCreditWon == 0 && result.risk?.busy != true ->
-                speak("여기는 주정차 금지구역이 아니에요. 세워도 돼요.")
+                speak("주변에 주정차 금지구역이 없어요.")
         }
         return result
     }
