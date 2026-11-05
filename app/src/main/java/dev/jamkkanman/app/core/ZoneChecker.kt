@@ -51,9 +51,15 @@ class ZoneChecker(val data: ZoneData) {
     private val lonMin = (data.zones.minOfOrNull { it.lon } ?: 0.0) - COVER_MARGIN_DEG
     private val lonMax = (data.zones.maxOfOrNull { it.lon } ?: 0.0) + COVER_MARGIN_DEG
 
-    /** 이 자리를 확인할 데이터가 있는지 (지금은 대치동과 그 주변만) */
-    fun covers(lat: Double, lon: Double): Boolean =
-        data.zones.isNotEmpty() && lat in latMin..latMax && lon in lonMin..lonMax
+    /**
+     * 이 자리를 확인할 데이터가 있는지. 데이터 파일에 확인 범위(행정구역 모양을 따라 만든 격자)가 있으면 그것으로,
+     * 없으면 금지구역 위치의 바깥 사각형으로 판단한다.
+     */
+    fun covers(lat: Double, lon: Double): Boolean {
+        if (data.zones.isEmpty()) return false
+        data.coverage?.let { return it.contains(lat, lon) }
+        return lat in latMin..latMax && lon in lonMin..lonMax
+    }
 
     /** 멈춘 자리 하나를 확인한다. */
     fun check(fix: Fix, hour: Int = currentHour()): CheckResult {

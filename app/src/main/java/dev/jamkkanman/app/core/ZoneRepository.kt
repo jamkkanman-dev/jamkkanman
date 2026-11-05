@@ -57,6 +57,17 @@ object ZoneRepository {
                 EnforcementCell(c.getDouble(0), c.getDouble(1), c.getInt(2))
             }
         } ?: emptyList()
+        // 확인 범위: {"lat0", "lon0", "cellM", "cols", "cells": [칸 번호...]}
+        val coverage = root.optJSONObject("coverage")?.let { c ->
+            val arr = c.optJSONArray("cells") ?: return@let null
+            Coverage(
+                lat0 = c.getDouble("lat0"),
+                lon0 = c.getDouble("lon0"),
+                cellM = c.getDouble("cellM"),
+                cols = c.getInt("cols"),
+                cells = HashSet<Int>(arr.length() * 2).apply { for (i in 0 until arr.length()) add(arr.getInt(i)) },
+            )
+        }
         return ZoneData(
             region = meta.optString("region", "알 수 없음"),
             isSample = meta.optBoolean("sample", false),
@@ -67,6 +78,7 @@ object ZoneRepository {
             cctvs = cctvs,
             enforcement = cells,
             enforcementPeriod = enf?.optString("label").orEmpty(),
+            coverage = coverage,
         )
     }
 

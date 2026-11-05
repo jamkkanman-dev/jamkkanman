@@ -1,6 +1,10 @@
-"""대치동 공공데이터 → 앱용 zones_daechi.json
+"""서울 강남구 공공데이터 → 앱용 zones_daechi.json (파일 이름은 처음 시연 지역 이름을 그대로 쓴다)
 
 사용법: python3 tools/build_zones.py <내려받은 파일 폴더> app/src/main/assets/zones_daechi.json
+
+- 범위: 강남구 소방용수시설이 있는 곳의 바깥 사각형 + 약 400m. 경계 근처 옆 구의 시설도 함께 넣는다.
+- 확인 범위(coverage): 강남구 소방용수시설 반경 300m 안의 100m 칸. 소화전은 거의 모든 길에 있어
+  강남구 모양을 따라가므로, 옆 구로 넘어가면 앱이 '확인 범위 밖'으로 안내한다.
 
 입력(공식 다운로드 파일):
   서울시 소방재난본부_소방용수시설_20251231.csv   (서울 열린데이터광장 OA-21306)
@@ -19,9 +23,14 @@ import pandas as pd
 DATA = sys.argv[1]
 OUT = sys.argv[2]
 
-# 대치동과 그 경계 바깥 조금
-LAT = (37.4880, 37.5160)
-LON = (127.0460, 127.0800)
+REGION = "강남구"
+MARGIN_DEG = 0.004   # 약 400m
+COVER_CELL_M = 100.0
+COVER_RADIUS_M = 300.0
+
+# 범위는 강남구 소방용수시설 위치로 정한다 (아래에서 채움)
+LAT = (0.0, 0.0)
+LON = (0.0, 0.0)
 
 
 def inside(lat, lon):
@@ -48,7 +57,35 @@ zones, spots = [], []
 
 # 1) 소방용수시설 (소화전 등) 5m
 h = pd.read_csv(f"{DATA}/서울시 소방재난본부_소방용수시설_20251231.csv", encoding="cp949", encoding_errors="replace", dtype=str)
-h = h[h.apply(lambda r: inside(r["위도"], r["경도"]), axis=1)]
+h["lat"] = pd.to_numeric(h["위도"], errors="coerce")
+h["lon"] = pd.to_numeric(h["경도"], errors="coerce")
+h = h.dropna(subset=["lat", "lon"])
+home = h[h["시군구명"] == REGION]
+# 좌표를 잘못 적은 행(예: 경도 137도)은 범위 계산에서 뺀다: 강남구 중심에서 10km 안만
+_clat, _clon = home["lat"].median(), home["lon"].median()
+home = home[(abs(home["lat"] - _clat) < 0.09) & (abs(home["lon"] - _clon) < 0.11)]
+LAT = (home["lat"].min() - MARGIN_DEG, home["lat"].max() + MARGIN_DEG)
+LON = (home["lon"].min() - MARGIN_DEG, home["lon"].max() + MARGIN_DEG)
+
+# 확인 범위: 강남구 소방용수시설 반경 300m 안의 100m 칸
+cov_lat0, cov_lon0 = LAT[0], LON[0]
+cov_kx = 111_320.0 * math.cos(math.radians(cov_lat0))
+cov_ky = 110_540.0
+cov_cols = int((LON[1] - LON[0]) * cov_kx // COVER_CELL_M) + 1
+cov_cells = set()
+reach = int(COVER_RADIUS_M // COVER_CELL_M) + 1
+for la, lo in zip(home["lat"], home["lon"]):
+    cx, cy = (lo - cov_lon0) * cov_kx, (la - cov_lat0) * cov_ky
+    c0, r0 = int(cx // COVER_CELL_M), int(cy // COVER_CELL_M)
+    for dr in range(-reach, reach + 1):
+        for dc in range(-reach, reach + 1):
+            c, r = c0 + dc, r0 + dr
+            if c < 0 or r < 0 or c >= cov_cols:
+                continue
+            if math.hypot((c + 0.5) * COVER_CELL_M - cx, (r + 0.5) * COVER_CELL_M - cy) <= COVER_RADIUS_M:
+                cov_cells.add(r * cov_cols + c)
+
+h = h[h.apply(lambda r: inside(r["lat"], r["lon"]), axis=1)]
 for _, r in h.iterrows():
     zones.append({
         "id": "h-" + r["시설번호"],
@@ -77,7 +114,6 @@ n_bus = len(zones) - n_hyd
 
 # 3) 어린이보호구역: 초등학교와 학원가 (시설 위치 반경 100m로 추정)
 s = pd.read_csv(f"{DATA}/전국어린이보호구역표준데이터.csv", encoding="cp949", dtype=str)
-s = s[s["소재지도로명주소"].fillna("").str.contains("강남구") | s["소재지지번주소"].fillna("").str.contains("강남구")]
 s = s[s["시설종류"].isin(["초등학교", "학원"])]
 s = s[s.apply(lambda r: inside(r["위도"], r["경도"]), axis=1)]
 s = s.drop_duplicates(subset=["대상시설명"])
@@ -173,9 +209,9 @@ if clear_demo:
 
 doc = {
     "meta": {
-        "region": "서울 강남구 대치동",
+        "region": "서울 강남구",
         "sample": False,
-        "note": "공식 공공데이터에서 대치동 주변만 골라 만든 파일. 어린이보호구역은 시설 위치 반경 100m로 추정. 횡단보도·교차로 모퉁이는 다음 버전에 추가.",
+        "note": "공식 공공데이터에서 서울 강남구와 경계 주변만 골라 만든 파일. 어린이보호구역은 시설 위치 반경 100m로 추정.",
         "sources": [
             "서울 열린데이터광장 · 서울시 소방용수시설 현황(OA-21306), 2025-12-31 기준 · 공공누리 1유형",
             "서울 열린데이터광장 · 서울시 버스정류소 위치정보(OA-15067), 2026-09-02 기준 · 공공누리 1유형",
@@ -188,11 +224,14 @@ doc = {
     "zones": zones,
     "spots": spots,
     "demo": demo,
+    "coverage": {"region": REGION, "lat0": round(cov_lat0, 6), "lon0": round(cov_lon0, 6), "cellM": COVER_CELL_M,
+                 "cols": cov_cols, "cells": sorted(cov_cells)},
 }
 with open(OUT, "w", encoding="utf-8") as f:
     json.dump(doc, f, ensure_ascii=False, separators=(",", ":"))
 
 print(json.dumps(doc["meta"]["counts"], ensure_ascii=False))
+print(f"bbox lat {LAT[0]:.4f}~{LAT[1]:.4f} lon {LON[0]:.4f}~{LON[1]:.4f} · 강남구 소방용수시설 {len(home)} · 확인 범위 {len(cov_cells)}칸(약 {len(cov_cells) * COVER_CELL_M ** 2 / 1e6:.1f}km²)")
 for d in demo:
     hs = hits(d["lat"], d["lon"])
     print(d["label"], d["lat"], d["lon"], "←", d["ref"], "| 걸림:", [(x["type"], x["name"]) for x in hs])

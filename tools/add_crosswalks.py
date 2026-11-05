@@ -1,4 +1,4 @@
-"""서울시 횡단보도 공공데이터 → zones_daechi.json 의 횡단보도(CROSSWALK) 금지구역
+"""서울시 횡단보도 공공데이터 → zones_daechi.json 의 횡단보도(CROSSWALK) 금지구역 (범위는 이미 만든 금지구역 파일을 따른다)
 
 사용법:
   python3 tools/add_crosswalks.py <A004_A.shp> <서울시 자치구 횡단보도 정보.csv> app/src/main/assets/zones_daechi.json
@@ -22,8 +22,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_basemap as bb  # noqa: E402  (shp/dbf 읽기와 좌표 변환을 함께 쓴다)
 
 SHP, CSV_PATH, ZONES = sys.argv[1], sys.argv[2], sys.argv[3]
-LAT_MIN, LAT_MAX = bb.LAT_MIN, bb.LAT_MAX
-LON_MIN, LON_MAX = bb.LON_MIN, bb.LON_MAX
+# 범위: 이미 만든 금지구역 파일(소화전·정류장 등)의 바깥 사각형 + 약 100m
+_base = [z for z in json.load(open(ZONES, encoding="utf-8"))["zones"] if z.get("type") not in ("CROSSWALK", "CORNER")]
+LAT_MIN, LAT_MAX = min(z["lat"] for z in _base) - 0.001, max(z["lat"] for z in _base) + 0.001
+LON_MIN, LON_MAX = min(z["lon"] for z in _base) - 0.001, max(z["lon"] for z in _base) + 0.001
 MATCH_M = 15.0  # 점과 모양이 이 거리 안이면 같은 횡단보도로 본다
 
 SRC_SHAPE = "서울시 교통안전시설물 횡단보도 정보(OA-15554, 2021-08)"
@@ -94,9 +96,29 @@ for idx, kind, (bx0, by0, bx1, by1), raw_shape in bb.iter_shapes(SHP):
     shapes.append({"id": attrs.get("MGRNU", str(idx)), "stat": attrs.get("STAT_CDE", ""), "ring": keep, "lat": lat0, "lon": lon0})
 
 # ---------------------------------------------------------------- 맞춰 보기
+# 넓은 범위에서도 빠르게 찾도록 점을 칸(약 66m × 70m)으로 나눠 둔다
+GLAT, GLON = 0.0006, 0.0008
+
+
+def cell(lat, lon):
+    return int(lat // GLAT), int(lon // GLON)
+
+
+def around(grid, lat, lon):
+    r, c = cell(lat, lon)
+    for dr in (-1, 0, 1):
+        for dc in (-1, 0, 1):
+            yield from grid.get((r + dr, c + dc), ())
+
+
+point_grid = {}
+for _p in points:
+    point_grid.setdefault(cell(_p["lat"], _p["lon"]), []).append(_p)
+
+
 def nearest_point(shape):
     best, hit = float("inf"), None
-    for p in points:
+    for p in around(point_grid, shape["lat"], shape["lon"]):
         if abs(p["lat"] - shape["lat"]) > 0.0006 or abs(p["lon"] - shape["lon"]) > 0.0008:
             continue
         d = dist_point_polygon(p["lat"], p["lon"], shape["ring"])
@@ -120,12 +142,16 @@ for s in shapes:
     zones.append({"id": f"c-{s['id']}", "type": "CROSSWALK", "name": name,
                   "lat": round(s["lat"], 6), "lon": round(s["lon"], 6), "shape": flat, "source": SRC_SHAPE})
 
+shape_grid = {}
+for _s in shapes:
+    shape_grid.setdefault(cell(_s["lat"], _s["lon"]), []).append(_s)
+
 added_points = 0
 for p in points:
     if p["id"] in used_points:
         continue
     near = any(dist_point_polygon(p["lat"], p["lon"], s["ring"]) <= MATCH_M
-               for s in shapes if abs(p["lat"] - s["lat"]) < 0.0006 and abs(p["lon"] - s["lon"]) < 0.0008)
+               for s in around(shape_grid, p["lat"], p["lon"]) if abs(p["lat"] - s["lat"]) < 0.0006 and abs(p["lon"] - s["lon"]) < 0.0008)
     if near:
         continue
     zones.append({"id": f"c-p-{p['id']}", "type": "CROSSWALK", "name": f"횡단보도 · {p['addr']}" if p["addr"] else "횡단보도",
@@ -142,8 +168,8 @@ src += [f"서울 열린데이터광장 · {SRC_SHAPE} · 공공누리 1유형",
 meta["sources"] = src
 counts = meta.setdefault("counts", {})
 counts["CROSSWALK"] = len(zones)
-meta["note"] = ("공식 공공데이터에서 대치동 주변만 골라 만든 파일. 어린이보호구역은 시설 위치 반경 100m로 추정. "
-                "횡단보도는 모양(면) 테두리에서 10m로 판단. 교차로 모퉁이는 다음 버전에 추가.")
+meta["note"] = ("공식 공공데이터에서 서울 강남구와 경계 주변만 골라 만든 파일. 어린이보호구역은 시설 위치 반경 100m로 추정. "
+                "횡단보도는 모양(면) 테두리에서 10m로 판단.")
 # 시연 지점: 학원가 버스정류장에서 가장 가까운 횡단보도
 demo = [d for d in doc.get("demo", []) if d.get("label") != "학원가 횡단보도"]
 base = next((d for d in demo if d.get("label") == "학원가 버스정류장"), None)

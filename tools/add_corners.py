@@ -404,7 +404,7 @@ meta = doc.setdefault("meta", {})
 meta["sources"] = [s for s in meta.get("sources", []) if "표준노드링크" not in s] + [
     "국토교통부 국가교통정보센터 · 전국표준노드링크(2026-10-14) · 교차로 모퉁이 추정"]
 meta.setdefault("counts", {})["CORNER"] = len(zones)
-meta["note"] = ("공식 공공데이터에서 대치동 주변만 골라 만든 파일. 어린이보호구역은 시설 위치 반경 100m로 추정. "
+meta["note"] = ("공식 공공데이터에서 서울 강남구와 경계 주변만 골라 만든 파일. 어린이보호구역은 시설 위치 반경 100m로 추정. "
                 "횡단보도는 모양(면) 테두리에서 10m로 판단. 교차로 모퉁이는 표준노드링크의 교차로와 차로 수로 "
                 "교차로 영역을 추정해 그 테두리에서 5m로 판단.")
 with open(ZONES, "w", encoding="utf-8") as f:

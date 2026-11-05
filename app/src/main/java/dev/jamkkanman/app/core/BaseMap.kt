@@ -104,6 +104,27 @@ class BaseMap(
 
     fun layer(name: String): List<Area> = areas[name].orEmpty()
 
+    /** 배경 도형이 들어 있는 범위 (m): minX, minY, maxX, maxY */
+    private val extent: FloatArray by lazy {
+        var x0 = Float.MAX_VALUE
+        var y0 = Float.MAX_VALUE
+        var x1 = -Float.MAX_VALUE
+        var y1 = -Float.MAX_VALUE
+        for (list in areas.values) for (a in list) {
+            if (a.minX < x0) x0 = a.minX
+            if (a.minY < y0) y0 = a.minY
+            if (a.maxX > x1) x1 = a.maxX
+            if (a.maxY > y1) y1 = a.maxY
+        }
+        floatArrayOf(x0, y0, x1, y1)
+    }
+
+    /** 이 점(m) 주변을 배경 도형으로 그릴 수 있는지. 배경은 시연 동네만 있어 그 밖에서는 도로망으로 그린다 */
+    fun covers(x: Float, y: Float, marginM: Float = 0f): Boolean {
+        val e = extent
+        return x >= e[0] + marginM && x <= e[2] - marginM && y >= e[1] + marginM && y <= e[3] - marginM
+    }
+
     companion object {
         const val DEFAULT_FILE = "basemap_daechi.json"
 

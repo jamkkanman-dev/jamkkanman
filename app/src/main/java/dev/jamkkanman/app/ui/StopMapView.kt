@@ -187,10 +187,11 @@ class StopMapView(context: Context, private val unit: Float) : View(context) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         tagRects.clear()
-        val bm = base
-        canvas.drawColor(if (bm != null) LAND else MAP_BG)
         val c = center
         val here = c?.let { meters(it.lat, it.lon) }
+        // 건물 배경(시연용 빌드)은 시연 동네만 있어, 그 밖에서는 도로망으로 그린다
+        val bm = base?.takeIf { b -> here == null || b.covers(here.first, here.second, BASE_EDGE_M) }
+        canvas.drawColor(if (bm != null) LAND else MAP_BG)
         if (here == null) {
             label.textAlign = Paint.Align.CENTER
             label.textSize = u(28f)
@@ -805,6 +806,8 @@ class StopMapView(context: Context, private val unit: Float) : View(context) {
 
         /** 이 거리 안의 점 금지구역만 지도에 표시 */
         private const val NEAR_M = 90f
+        /** 내 차가 건물 배경 범위 끝에서 이만큼 안쪽일 때만 배경으로 그린다 (화면 가장자리가 비지 않게) */
+        private const val BASE_EDGE_M = 120f
         private const val MAX_LABELS = 7
         /** 도로 이름을 넣지 않는 위·아래 띠 (디자인 기준 px) */
         private const val LABEL_TOP_PX = 70f

@@ -10,6 +10,8 @@ captures/
 .kotlin/
 
 # 서명 키·비밀값은 저장소에 올리지 않음
+# (서명 APK는 app/release/에 만들어진 뒤 이름을 바꿔 apk/에만 올린다)
+app/release/
 *.keystore
 *.jks
 keystore.properties

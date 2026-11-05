@@ -1,23 +1,33 @@
 """국토교통부 전국 표준노드링크(MOCT_LINK) → 앱 지도용 roads_daechi.json
 
-사용법: python3 tools/build_roads.py <MOCT_LINK.shp 가 있는 폴더> app/src/main/assets/roads_daechi.json
+사용법: python3 tools/build_roads.py <[2026-10-14]NODELINKDATA.zip 또는 MOCT_LINK.shp 가 있는 폴더> \
+          app/src/main/assets/roads_daechi.json [app/src/main/assets/zones_daechi.json]
 
-- 입력: 국가교통정보센터(ITS) 전국표준노드링크 [2026-10-14]NODELINKDATA.zip 의 MOCT_LINK.shp/.dbf
+- 입력: 국가교통정보센터(ITS) 전국표준노드링크 [2026-10-14]NODELINKDATA.zip 의 MOCT_LINK.shp/.dbf (zip 그대로 읽는다)
+- 범위: 금지구역 파일을 주면 그 바깥 사각형 + 약 300m (지금은 서울 강남구와 경계 주변), 없으면 대치동 기본값
 - 좌표계: GRS80 횡축 메르카토르 (중부원점 38N 127E, 가산 200000/600000) → 위도·경도 → 기준점 기준 미터
 - 외부 라이브러리 없이 동작하도록 shapefile·dbf 읽기와 좌표 변환을 직접 구현했다.
 """
+import io
 import json
 import math
+import os
 import struct
 import sys
+import zipfile
 
 SRC = sys.argv[1]
 OUT = sys.argv[2]
 
-# 지도에 담을 범위 (대치동과 그 주변)
-LAT_MIN, LAT_MAX = 37.484, 37.520
-LON_MIN, LON_MAX = 127.040, 127.088
-ORIGIN = (37.500, 127.060)
+# 지도에 담을 범위: 금지구역 파일이 있으면 그 바깥 사각형 + 약 300m
+if len(sys.argv) > 3:
+    _zs = json.load(open(sys.argv[3], encoding="utf-8"))["zones"]
+    LAT_MIN, LAT_MAX = min(z["lat"] for z in _zs) - 0.003, max(z["lat"] for z in _zs) + 0.003
+    LON_MIN, LON_MAX = min(z["lon"] for z in _zs) - 0.003, max(z["lon"] for z in _zs) + 0.003
+else:
+    LAT_MIN, LAT_MAX = 37.484, 37.520
+    LON_MIN, LON_MAX = 127.040, 127.088
+ORIGIN = (37.500, 127.060)  # 시연용 건물 배경(build_basemap.py)과 같은 기준점
 
 # ---------------------------------------------------------------- 좌표 변환 (Snyder, Map Projections 1987)
 A = 6378137.0
@@ -98,8 +108,8 @@ def simplify(pts, tol=1.0):
 
 
 # ---------------------------------------------------------------- dbf
-def open_dbf(path):
-    f = open(path, "rb")
+def open_dbf(f):
+    """dbf 헤더를 읽어 (파일, 레코드 수, 헤더 길이, 레코드 길이, 필드 위치)를 돌려준다"""
     head = f.read(32)
     nrec, hlen, rlen = struct.unpack("<IHH", head[4:12])
     fields, off = [], 1
@@ -131,10 +141,18 @@ x_max, y_max = forward(LAT_MAX, LON_MAX)
 x_lo, x_hi = min(x_min, forward(LAT_MAX, LON_MIN)[0]) - 50, max(x_max, forward(LAT_MIN, LON_MAX)[0]) + 50
 y_lo, y_hi = y_min - 50, y_max + 50
 
-dbf = open_dbf(f"{SRC}/MOCT_LINK.dbf")
+
+def open_member(name):
+    """zip이면 그 안의 파일을 메모리로 읽어 seek 가능한 파일처럼 돌려준다 (dbf는 레코드 위치로 건너뛰며 읽는다)"""
+    if SRC.lower().endswith(".zip"):
+        return io.BytesIO(zipfile.ZipFile(SRC).read(name))
+    return open(os.path.join(SRC, name), "rb")
+
+
+dbf = open_dbf(open_member("MOCT_LINK.dbf"))
 want = [n for n in ("ROAD_RANK", "LANES", "ROAD_NAME", "ROAD_USE") if n in dbf[4]]
 roads = []
-with open(f"{SRC}/MOCT_LINK.shp", "rb") as shp:
+with open_member("MOCT_LINK.shp") as shp:
     shp.seek(100)
     idx = 0
     while True:

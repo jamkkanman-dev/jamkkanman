@@ -111,6 +111,27 @@ data class EnforcementCell(
     val count: Int,
 )
 
+/**
+ * 금지구역을 확인할 수 있는 범위. 행정구역(강남구) 소방용수시설 위치를 따라 만든 격자라
+ * 사각형 범위와 달리 옆 구로 넘어가면 '확인 범위 밖'으로 안내한다.
+ */
+class Coverage(
+    private val lat0: Double,
+    private val lon0: Double,
+    private val cellM: Double,
+    private val cols: Int,
+    private val cells: Set<Int>,
+) {
+    private val kx = 111_320.0 * kotlin.math.cos(Math.toRadians(lat0))
+
+    fun contains(lat: Double, lon: Double): Boolean {
+        val col = kotlin.math.floor((lon - lon0) * kx / cellM).toInt()
+        val row = kotlin.math.floor((lat - lat0) * 110_540.0 / cellM).toInt()
+        if (col < 0 || row < 0 || col >= cols) return false
+        return (row * cols + col) in cells
+    }
+}
+
 data class ZoneData(
     val region: String,
     val isSample: Boolean,
@@ -120,8 +141,9 @@ data class ZoneData(
     val demo: List<DemoPlace>,
     val cctvs: List<Cctv> = emptyList(),
     val enforcement: List<EnforcementCell> = emptyList(),
-    /** 단속 기록 기간 (화면 표시용, 예: "최근 3개월") */
+    /** 단속 기록 기간 (화면 표시용, 예: "2025년 10~12월") */
     val enforcementPeriod: String = "",
+    val coverage: Coverage? = null,
 ) {
     companion object {
         val EMPTY = ZoneData("데이터 없음", true, emptyList(), emptyList(), emptyList(), emptyList())
