@@ -29,6 +29,11 @@ class StopEngine(
     private val ask: ((question: String, onAnswer: (Boolean?) -> Unit) -> Boolean)? = null,
 ) {
     private data class Session(val lat: Double, val lon: Double, var lastAtMs: Long)
+
+    /** 도착 전 안내의 진행 상태 (화면 카드에 쓴다) */
+    enum class ArrivalState { ASKING, ADDED, DECLINED, NO_ANSWER, INFORMED }
+
+    data class Arrival(val place: String, val hit: ZoneHit, val spot: SpotHint?, val state: ArrivalState, val atMs: Long)
     private data class Pending(val type: ZoneType, val lat: Double, val lon: Double, val atMs: Long)
 
     var gear: VehicleGear? = null
@@ -68,6 +73,9 @@ class StopEngine(
     var lastCreditWon: Int = 0
         private set
     var destination: DestinationInfo? = null
+        private set
+    /** 마지막 도착 전 안내. 새로 멈춰 자리를 확인하면 지운다 */
+    var arrival: Arrival? = null
         private set
     /** 마지막으로 자리를 확인한 시각 (벽시계 ms) */
     var lastCheckedAtMs: Long = 0
@@ -191,6 +199,7 @@ class StopEngine(
     fun stopMoment(reason: String) {
         val now = SystemClock.elapsedRealtime()
         lastReason = reason
+        arrival = null
         val fix = location()
         if (fix == null) {
             log("$reason: 위치를 몰라 확인하지 못함")
@@ -271,12 +280,14 @@ class StopEngine(
             val asked = ask?.invoke(question) { answer -> onArrivalAnswer(info.name, spot, answer) } == true
             if (asked) {
                 lastSpoken = question
+                arrival = Arrival(info.name, top, spot, ArrivalState.ASKING, SystemClock.elapsedRealtime())
                 log("도착 전 확인: ${info.name} → ${top.zone.type.title} · 경유지 물어봄")
                 onChange()
                 return
             }
         }
         val added = spot != null && ledger.autoWaypoint && addWaypoint(spot.spot)
+        arrival = Arrival(info.name, top, spot, if (added) ArrivalState.ADDED else ArrivalState.INFORMED, SystemClock.elapsedRealtime())
         speak(Speech.beforeArrival(top, spot, added))
         log("도착 전 확인: ${info.name} → ${top.zone.type.title}${if (added) " · 경유지 추가" else ""}")
         onChange()
@@ -284,6 +295,14 @@ class StopEngine(
 
     private fun onArrivalAnswer(place: String, spot: SpotHint, answer: Boolean?) {
         val added = answer == true && addWaypoint(spot.spot)
+        arrival = arrival?.copy(
+            state = when {
+                added -> ArrivalState.ADDED
+                answer == false -> ArrivalState.DECLINED
+                else -> ArrivalState.NO_ANSWER
+            },
+            atMs = SystemClock.elapsedRealtime(),
+        )
         speak(Speech.arrivalAnswer(spot, answer, added))
         log("도착 전 확인: $place → 대답 ${when (answer) { true -> "응"; false -> "아니"; null -> "없음" }}${if (added) " · 경유지 추가" else ""}")
         onChange()
@@ -324,6 +343,7 @@ class StopEngine(
         lastCreditWon = 0
         lastCheckedAtMs = 0
         announcedDestination = null
+        arrival = null
         onChange()
     }
 

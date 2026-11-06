@@ -13,6 +13,7 @@ import android.content.res.Configuration
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.Gravity
 import android.view.View
@@ -423,7 +424,35 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
             }
         }
         map.notice = if (outsideNow && (result == null || !result.covered)) "이 지역은 데이터가 없어요 · ${data.region}만 들어 있어요" else null
+        val arrival = engine.arrival?.takeIf {
+            it.state == StopEngine.ArrivalState.ASKING || SystemClock.elapsedRealtime() - it.atMs < ARRIVAL_CARD_MS
+        }
         when {
+            arrival != null -> {
+                // 도착 전 안내: 묻는 중이면 무엇을 말하면 되는지 크게 보여 준다
+                mood = StopMapView.Mood.MAYBE
+                val asking = arrival.state == StopEngine.ArrivalState.ASKING
+                stateChip.text = when (arrival.state) {
+                    StopEngine.ArrivalState.ADDED -> "경유지 추가"
+                    else -> "도착 전 확인"
+                }
+                if (arrival.state == StopEngine.ArrivalState.ADDED) ui.styleChip(stateChip, Palette.SURFACE, Palette.GREEN)
+                else ui.styleChip(stateChip, Palette.SURFACE, Palette.BLUE)
+                reasonText.text = "목적지 ${arrival.place}"
+                titleText.text = "목적지 앞은 ${arrival.hit.zone.type.title}"
+                titleText.setTextColor(Palette.TEXT)
+                val spotName = arrival.spot?.let { Speech.spokenName(it.spot.name) }
+                detailText.text = when (arrival.state) {
+                    StopEngine.ArrivalState.ASKING ->
+                        "${spotName?.let { Speech.josa(it, "을", "를") } ?: "세울 곳을"} 경유지로 넣을까요?\n" +
+                            if (answer.listening) "듣는 중 · \u2018응\u2019 또는 \u2018아니\u2019로 답해 주세요" else "질문이 끝나면 \u2018응\u2019 또는 \u2018아니\u2019로 답해 주세요"
+                    StopEngine.ArrivalState.ADDED -> "${spotName?.let { Speech.josa(it, "을", "를") } ?: "세울 곳을"} 경유지로 넣었어요"
+                    StopEngine.ArrivalState.DECLINED -> "경유지는 넣지 않았어요"
+                    StopEngine.ArrivalState.NO_ANSWER -> "대답을 듣지 못해 경유지는 넣지 않았어요\n아래 \u2018여기로 안내\u2019로 바로 넣을 수 있어요"
+                    StopEngine.ArrivalState.INFORMED -> spotName?.let { "${Speech.josa(it, "이", "가")} 목적지에서 ${Speech.metersShort(arrival.spot.distanceM)} 거리에 있어요" } ?: "조금 떨어진 곳에 세워 주세요"
+                }
+                if (asking && answer.listening) titleText.setTextColor(Palette.BLUE)
+            }
             result == null && outsideNow -> {
                 // 데이터가 없는 곳에서 켠 경우 (에뮬레이터 기본 위치 등): 빈 지도 대신 무엇을 하면 되는지 알려 준다
                 mood = StopMapView.Mood.NEUTRAL
@@ -895,5 +924,7 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
         private const val GLEO_COLD_START_MS = 2_500L
         private const val REQ_LOCATION = 2001
         private const val ASK_LISTEN_FALLBACK_MS = 12_000L
+        /** 도착 전 안내 카드를 대답 뒤에도 이만큼 보여 준다 */
+        private const val ARRIVAL_CARD_MS = 60_000L
     }
 }
