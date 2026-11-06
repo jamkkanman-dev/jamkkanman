@@ -61,6 +61,18 @@ object Speech {
         return sb.toString()
     }
 
+    /** 도착 전, 대답을 들을 수 있을 때: 경유지로 넣을지 묻는다 */
+    fun arrivalQuestion(hit: ZoneHit, spot: SpotHint): String =
+        "목적지 앞은 ${hit.zone.type.spoken}이에요. ${josa(spokenName(spot.spot.name), "을", "를")} 경유지로 넣을까요?"
+
+    /** 물음에 대한 대답 뒤에 하는 말 */
+    fun arrivalAnswer(spot: SpotHint, answer: Boolean?, added: Boolean): String = when {
+        answer == true && added -> "${josa(spokenName(spot.spot.name), "을", "를")} 경유지로 넣었어요."
+        answer == true -> "경유지를 넣지 못했어요. 화면에서 여기로 안내를 눌러 주세요."
+        answer == false -> "알겠어요."
+        else -> "대답을 듣지 못해서 경유지는 넣지 않았어요."
+    }
+
     /** 받침 유무에 맞춰 조사를 붙인다. 한글이 아니면 받침 없는 쪽을 쓴다. */
     fun josa(word: String, withBatchim: String, withoutBatchim: String): String {
         val last = word.trimEnd().lastOrNull() ?: return word + withoutBatchim

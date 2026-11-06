@@ -9,12 +9,13 @@
 
 | 기능 | 내용 | 사용한 Pleos / 차량 API |
 |---|---|---|
-| 멈추는 순간 감지 | 기어를 P로 바꾸거나 문이 열리면 그 자리를 바로 확인 | Android Automotive `GEAR_SELECTION` (Pleos SDK 권장 방식), Pleos Vehicle SDK `Door` |
+| 멈추는 순간 감지 | 기어를 P로 바꾸거나, 멈춘 채(차속 3km/h 미만) 안전벨트가 풀리거나, 문이 열리면 그 자리를 바로 확인. 안전벨트는 문이 열리기 몇 초 전에 오는 신호라 기어 D에 브레이크만 밟고 내려 주는 정차도 더 일찍 잡음. 주행 중(5km/h 이상)에는 화면을 가리고 음성으로만 안내 | Android Automotive `GEAR_SELECTION`(Pleos SDK 권장 방식)·`PERF_VEHICLE_SPEED`(차속), Pleos Vehicle SDK `Seat`(안전벨트)·`Brake`·`Door`. Pleos 신호는 모두 `check…Capabilities`로 차가 지원하는지 먼저 확인한 뒤 구독 |
 | 금지구역 확인 | 소화전 5m, 교차로 모퉁이 5m(교차로 가장자리에서 측정), 버스정류장 10m, 횡단보도 10m(실제 횡단보도 모양의 테두리에서 측정), 어린이보호구역 안인지 확인. 과태료와 몇 m만 옮기면 되는지까지 안내 | 강남구 공공데이터 (아래 데이터 출처) |
 | 단속 위험 알림 | 단속 CCTV가 50m 안이면 경고에 덧붙이고, 반경 50m 안 실제 단속 건수(2025년 10~12월)를 보여 줌. 금지구역이 아니어도 단속이 잦은 곳이면 노란 선을 확인하라고 안내 | 서울시 단속 CCTV 위치·불법주정차 단속 정보 |
 | 한 번만 음성 안내 | 같은 자리에서는 다시 말하지 않음. 운전 중에는 화면 대신 음성 | Pleos TextToSpeech SDK (기기 내 합성) |
 | 세울 곳 안내 | 가장 가까운 공영주차장을 보여 주고 버튼 한 번으로 길 안내 또는 경유지 추가 | Pleos NaviHelper SDK |
-| 도착 전 안내 | 목적지 앞이 금지구역이면 도착 700m 전에 미리 알리고 세울 곳을 경유지로 추가 | Pleos NaviHelper SDK |
+| 도착 전 안내 | 목적지 앞이 금지구역이면 도착 700m 전에 미리 알리고 “경유지로 넣을까요?”라고 물어 “응”이면 세울 곳을 경유지로 추가 (음성 인식을 못 쓰는 환경이면 설정대로 바로 추가) | Pleos NaviHelper SDK, SpeechToText SDK(기기 내 인식) |
+| 정밀 위치 | 멈춘 자리는 Pleos 정밀 위치(GPS·차량 센서 결합)를 먼저 쓰고, 없으면 내비·기기 GPS 위치를 씀. 내비 위치는 도로 가운데에 맞춘 값이라 길가에 선 차의 자리는 정밀 위치가 더 가까움 | Pleos FusedLocation SDK |
 | 음성으로 묻기 | "여기 세워도 돼?", "근처에 세울 데 어디야?", "이번 달 과태료 얼마 아꼈어?"를 말로 물으면 답함 | Pleos Gleo AI 연동 (`assets/schema.json`) |
 | 이번 달 아낀 과태료 | 알림을 듣고 금지구역 밖으로 옮겨 세웠을 때만 더함 | 앱 내부 기록 |
 | 정차 수요 기록 | 운전자가 동의했을 때만, 정확한 위치 대신 약 50m 칸·시간대·요일만 차 안에 저장 (지자체 안심 승하차 구역 설계용) | 앱 내부 기록 |
@@ -37,6 +38,12 @@
    PC 브라우저에서 `http://127.0.0.1:8088/` → `Emulation Controls`
    - `Gear Selection`: D → P
    - `Door Position`: Front left → Open
+   - 안전벨트: Virtual Console에 조작 항목이 없어, 앱의 `시연` → `안전벨트 풀림`을 누르면 뒷좌석 벨트를 채웠다가 푸는 신호를 그대로 넣습니다.
+   - 차속: Virtual Console 화면에는 없지만 같은 서버로 보낼 수 있습니다. 터미널에서 아래를 실행하면 30km/h로 달리다 약 4초에 걸쳐 멈춥니다 (주행 중 화면 가림 → 정차 확인).
+     ```
+     curl -X PUT "http://127.0.0.1:8088/vehicle/controls?speed=30"
+     ```
+   - 음성 대답: `시연` → `도착 전 안내`를 누르면 “…경유지로 넣을까요?”라고 묻고 6초 동안 듣습니다. 맥 마이크로 “응”이라고 답하려면 에뮬레이터 오른쪽 `⋯`(Extended controls) → `Microphone` → `Virtual microphone uses host audio input`을 켭니다.
    - 신호 없이 보려면 앱의 `멈춤 신호` 버튼을 눌러도 됩니다. 같은 자리 안내를 다시 들으려면 `초기화`.
 
 ## 테스트 환경 및 필요한 설정
@@ -44,9 +51,9 @@
 | 항목 | 내용 |
 |---|---|
 | 에뮬레이터 | Pleos Connect Emulator v2.1.0 (Android 14, API 34, arm64), 2560×1440 가로 |
-| Pleos SDK | Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech 3.3.1 |
+| Pleos SDK | Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech 3.3.1, FusedLocation 1.1.3, SpeechToText 3.3.1 |
 | 빌드 | Android Gradle Plugin 8.8.2, Gradle 8.10.2, Kotlin 2.0.0, compileSdk 35 / minSdk 28 / targetSdk 34 |
-| 권한 | 위치(실행 중 허용), `android.car.permission.CAR_POWERTRAIN`, `pleos.car.permission.CAR_DRIVE · CAR_LIGHTS · CAR_DOORS · CAR_SAFETY · NAVI_ROUTE · NAVI_ROUTE_SEARCH · TTS_SERVICE` |
+| 권한 | 위치·차속(실행 중 허용, `android.car.permission.CAR_SPEED`), `android.car.permission.CAR_POWERTRAIN`, `pleos.car.permission.CAR_DRIVE · CAR_LIGHTS · CAR_DOORS · CAR_SEATS · CAR_SAFETY · NAVI_ROUTE · NAVI_ROUTE_SEARCH · TTS_SERVICE · STT_SERVICE · FUSED_LOCATION` (모두 3rd party 앱용 권한, 시스템 앱 전용 `PRIVATE_*` 권한은 쓰지 않음) |
 | 음성 | 별도 설정 없이 기기 내 합성(ON_DEVICE)으로 동작. Pleos 앱 등록 정보가 있으면 `local.properties`에 `pleos.clientId`, `pleos.clientSecret`을 넣어 서버 합성도 쓸 수 있습니다 (저장소에는 넣지 않음). |
 | 시간 | 어린이보호구역 과태료 시간대(08~20시)는 기기 시간대와 관계없이 한국 시각으로 계산합니다. |
 | 참고 | 메모리 8GB 맥북 에어(M2)에서는 AVD 메모리 3GB, 그래픽 Host 설정에서 원활했습니다. |
@@ -58,9 +65,39 @@
 |---|---|---|
 | 기어 P | Android Automotive `GEAR_SELECTION` | 동작 확인 |
 | 문 열림 | Pleos Vehicle SDK `Door.registerDoorPosition` | 동작 확인 |
-| 비상등 | ① Android Automotive `HAZARD_LIGHTS_STATE` ② Pleos `TurnSignal` ③ Pleos `Safety` 경고등(Telltales) | 3rd party 앱에는 신호가 열려 있지 않음 (①은 속성 미노출, ②는 비상등 때 값이 바뀌지 않음, ③은 실시간 구독이 시스템 앱 전용 권한이고 조회도 거부됨) |
+| 차속 | Android Automotive `PERF_VEHICLE_SPEED` | 신호 확인 앱(probe)에서 값 수신 확인, Virtual Console 서버(`/vehicle/controls?speed=`)로 값 변경 확인 |
+| 브레이크 | Pleos Vehicle SDK `Brake.registerBrakePedalStatus` | 신호 확인 앱(probe)에서 값 수신 확인, Virtual Console `Brake Pedal`로 변경 |
+| 안전벨트 풀림 | Pleos Vehicle SDK `Seat.registerSeatBeltBuckledState` | 에뮬레이터 차량 설정(VHAL)에 `SEAT_BELT_BUCKLED`는 있으나 Virtual Console에 조작 항목이 없고 서버도 값을 받지 않음 → 앱 `시연` 줄의 `안전벨트 풀림` 버튼으로 같은 신호 흐름을 재현 |
+| 비상등 | ① Android Automotive `HAZARD_LIGHTS_STATE` ② Pleos `TurnSignal` ③ Pleos `Safety` 경고등(Telltales) | 3rd party 앱에는 신호가 열려 있지 않음 (①은 시스템 앱 전용 권한 `CAR_EXTERIOR_LIGHTS`, ②는 비상등 때 값이 바뀌지 않음, ③은 실시간 구독이 시스템 앱 전용 권한이고 조회도 거부됨) |
 
-비상등은 Pleos가 3rd party 앱에 신호를 열어 주면 바로 쓸 수 있도록 판단 코드를 남겨 두었습니다 (`car/VehicleWatcher.kt`, `car/CarGearSource.kt`).
+비상등 대신 **안전벨트 풀림**으로 '내려 주는 정차'를 잡습니다. 달리는 중에 푼 것과 구별하려고 차가 멈춰 있을 때(차속 3km/h 미만, 또는 풀린 뒤 15초 안에 멈출 때)만 정차로 봅니다. Pleos SDK에는 차속 API가 없어 기어와 같은 방식으로 Android Automotive 표준 차속 속성을 쓰고, 차속을 못 받는 차에서는 기어 P·N·브레이크로 판단합니다 (`core/StopEngine.kt`). 경고등 조회(3rd party 권한 `CAR_SAFETY`)는 차에서 허용되면 비상등도 바로 쓰도록 남겨 두었고, 거부되면 한 번만 시도하고 멈춥니다 (`car/VehicleWatcher.kt`).
+
+## 테스트
+
+`app/src/test`에 단위 테스트 39개가 있습니다. Android Studio 프로젝트 창(Android 보기)에서 `app` → `kotlin+java` → `dev.jamkkanman.app.core (test)`를 오른쪽 클릭 → `Run 'Tests in 'core''`, 또는 `./gradlew :app:testDebugUnitTest`.
+
+| 테스트 | 확인하는 것 |
+|---|---|
+| `ZoneBasicsTest` | 거리 계산, 과태료(어린이보호구역 08~20시), 횡단보도 모양 안·밖 거리, 확인 범위 격자 |
+| `ZoneCheckerTest` | 반경 안·밖, GPS 오차 '가능성' 단계(오차의 절반, 최대 5m), 여러 구역이 겹칠 때 순서, 데이터 범위 밖, 단속 CCTV·단속 건수, 세울 곳, 도착 전 확인 |
+| `SpeechTest` | 음성 문장(금액·거리 읽기, 조사, 가능성 단계는 단정하지 않기, 금지구역 밖을 '세워도 된다'고 판정하지 않기, 도착 전 경유지 질문과 대답별 응답) |
+| `YesNoTest` | 짧은 음성 대답 응/아니/모름 나누기 ('아니'가 섞이면 경로를 바꾸지 않기, 한 글자 대답은 낱말일 때만) |
+| `DemoDataTest` | 실제 강남구 데이터 개수·좌표, 시연 지점 8곳이 늘 같은 결과를 내는지, 에뮬레이터 기본 위치(성남시)·서초구가 범위 밖인지 |
+| `GpsNoiseTest` | GPS 오차 시험 (아래) |
+
+### GPS 오차 시험 (`GpsNoiseTest`)
+
+대치동 학원가 반경 2km 안 실제 금지구역 2,904곳(어린이보호구역 제외)에서 무작위로 고른 구역의 중심에서 0~(반경+15m) 떨어진 '진짜 위치'를 만들고, 동서·남북으로 표준편차 σ인 오차를 더한 '잡힌 위치'로 판단했습니다. 정확도 값은 1.5σ로 넣었고, 구역 경계 근처만 골라 뽑아 가장 어려운 경우를 본 것입니다. 오차마다 약 3,000번, 씨앗값을 고정해 매번 같은 숫자가 나옵니다.
+
+| σ | 진짜 금지구역 안: 확실 경고 / 가능성 / **놓침** | ('가능성' 단계가 없을 때 놓침) | 진짜 밖(경계 15m 안): **확실 경고(오경보)** / 가능성 / 조용 |
+|---|---|---|---|
+| 2m | 92.8% / 4.7% / **2.6%** | 7.2% | **6.9%** / 8.9% / 84.2% |
+| 3m | 87.8% / 8.0% / **4.2%** | 12.2% | **9.6%** / 13.4% / 77.0% |
+| 5m | 77.4% / 14.1% / **8.5%** | 22.6% | **15.1%** / 20.7% / 64.2% |
+
+- '가능성' 단계(GPS 오차의 절반, 최대 5m 여유)가 놓침을 약 3분의 1로 줄입니다 (σ=3m에서 12.2% → 4.2%).
+- 오경보는 금지구역 경계 바로 바깥(15m 안)에서만 생기며, 이 시험은 그런 위치만 뽑았기 때문에 실제 주행에서의 비율보다 높게 나옵니다.
+- 공공데이터 자체의 위치 오차(시설 좌표와 실제 위치의 차이)는 이 시험에 들어 있지 않습니다.
 
 ## Gleo AI 음성 연동
 
@@ -90,6 +127,14 @@
 - **시연용 빌드**: 행정안전부 도로명주소 도형(건물·실폭도로·하천·공원)을 함께 그립니다. 이 자료는 수령 조건상 국외 반출이 금지되어, 해외 서버인 GitHub 저장소와 제출 APK에는 넣지 않았습니다.
   - 직접 쓰려면 [주소기반산업지원서비스](https://business.juso.go.kr)에서 자료를 신청해 받은 뒤 `tools/build_basemap.py`로 `app/src/debug/assets/basemap_daechi.json`을 만들면 debug 빌드에만 들어갑니다.
 - **입체(3D) 보기**: 비스듬히 내려다보는 원근 투영으로 건물을 세워 그립니다. 건물 도형에는 층수 정보가 없어 높이는 바닥 넓이로 정한 표현이며 실제 층수가 아닙니다.
+
+## 지자체용 정차 수요 지도 (시제품)
+
+`dashboard/index.html`을 브라우저로 열면 됩니다 (인터넷 연결·설치 필요 없음). 단속이 반복되는데 200m 안에 공영주차장이 없는 강남구 100m 칸을 단속 건수 순으로 10곳 골라 '안심 승하차 구역 후보지'로 보여 줍니다.
+
+- 데이터: 앱에 들어 있는 공공데이터만 씁니다 (서울시 불법주정차 단속 정보 2025년 10~12월 중 강남구 위치 기록 24,138건, 공영주차장, 어린이보호구역, 표준노드링크 도로). 만드는 방법: `python3 tools/build_demand_map.py` → `dashboard/demand.js`
+- 강남구 위치 단속 기록의 47%가 상위 10% 칸(100m)에 몰려 있어, 승하차 구역을 몇 곳만 골라 만들어도 효과를 볼 수 있는 구조입니다.
+- 실제 서비스에서는 여기에 잠깐만 사용자가 동의한 정차 기록(약 50m 칸·시간대·요일, 앱 설정 '정차 수요 지도에 익명으로 보태기')이 더해집니다.
 
 ## 데이터 출처
 

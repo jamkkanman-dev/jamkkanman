@@ -36,6 +36,8 @@ class Voice(
     private var pleos: PleosTts? = null
     private var android: AndroidTts? = null
     private var waiting: String? = null
+    /** 지금 읽는 말이 끝나면 부를 일 (새 말이 들어오면 이전 것은 버린다: 그 말은 끊겼으므로) */
+    private var doneCallback: (() -> Unit)? = null
     private var lastText: String? = null
     private var fellBack = false
     private val modes: ArrayDeque<Mode> = ArrayDeque(
@@ -62,7 +64,10 @@ class Voice(
         override fun onReady() {}
 
         override fun onDone() {
-            main.post { status("음성 안내 끝 (Pleos ${currentMode?.name})") }
+            main.post {
+                status("음성 안내 끝 (Pleos ${currentMode?.name})")
+                finishDone()
+            }
         }
 
         override fun onError(errorType: ErrorType) {
@@ -176,28 +181,50 @@ class Voice(
         if (status != AndroidTts.SUCCESS) {
             available = false
             status("안드로이드 음성 엔진도 없어 화면으로만 알려요")
+            finishDone()
             return
         }
         val lang = tts.setLanguage(Locale.KOREAN)
         if (lang == AndroidTts.LANG_MISSING_DATA || lang == AndroidTts.LANG_NOT_SUPPORTED) {
             available = false
             status("안드로이드 한국어 음성이 없어 화면으로만 알려요")
+            finishDone()
             return
         }
         tts.setAudioAttributes(guidance)
+        tts.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {}
+
+            override fun onDone(utteranceId: String?) {
+                main.post { finishDone() }
+            }
+
+            @Deprecated("Deprecated in Java")
+            override fun onError(utteranceId: String?) {
+                main.post { finishDone() }
+            }
+        })
         engine = Engine.ANDROID
         available = true
         status("음성 안내 준비됨 (안드로이드)")
         flushWaiting()
     }
 
-    fun say(text: String) {
+    /** @param onDone 다 읽은 뒤 부른다 (음성을 못 내면 바로 부른다). 묻고 나서 대답을 들을 때 쓴다 */
+    fun say(text: String, onDone: (() -> Unit)? = null) {
         lastText = text
+        doneCallback = onDone
         when (engine) {
             Engine.PLEOS -> speakPleos(text)
             Engine.ANDROID -> android?.speak(text, AndroidTts.QUEUE_FLUSH, null, "jamkkanman-${System.nanoTime()}")
-            Engine.NONE -> if (available != false) waiting = text // 준비 전에는 마지막 말만 남긴다
+            Engine.NONE -> if (available == false) finishDone() else waiting = text // 준비 전에는 마지막 말만 남긴다
         }
+    }
+
+    private fun finishDone() {
+        val callback = doneCallback ?: return
+        doneCallback = null
+        callback()
     }
 
     private fun speakPleos(text: String) {
@@ -214,7 +241,8 @@ class Voice(
     private fun flushWaiting() {
         val text = waiting ?: return
         waiting = null
-        say(text)
+        val callback = doneCallback
+        say(text, callback)
     }
 
     private fun releasePleos() {

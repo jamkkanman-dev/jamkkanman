@@ -11,15 +11,24 @@
 
     <!-- 기어 레버 위치 (Android Automotive 표준 속성 GEAR_SELECTION) -->
     <uses-permission android:name="android.car.permission.CAR_POWERTRAIN" />
-    <!-- 비상등 상태 (Android Automotive 표준 속성 HAZARD_LIGHTS_STATE) -->
-    <uses-permission android:name="android.car.permission.CAR_EXTERIOR_LIGHTS" />
+    <!-- 차속 (Android Automotive 표준 속성 PERF_VEHICLE_SPEED): 멈췄는지 판단, 주행 중 화면 가림 -->
+    <uses-permission android:name="android.car.permission.CAR_SPEED" />
 
-    <!-- Pleos Vehicle SDK: 기어(대체용), 방향지시등, 문 -->
+    <!-- Pleos Vehicle SDK (3rd party 앱용 권한만 사용, 각 신호는 check…Capabilities로 지원 여부를 먼저 확인) -->
+    <!-- 기어(대체용)·브레이크 페달 -->
     <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />
+    <!-- 방향지시등 -->
     <uses-permission android:name="pleos.car.permission.CAR_LIGHTS" />
+    <!-- 문 열림 -->
     <uses-permission android:name="pleos.car.permission.CAR_DOORS" />
-    <!-- 계기판 경고등(Telltales): 좌우 방향지시등 표시가 동시에 켜지면 비상등으로 판단 -->
+    <!-- 안전벨트 풀림 (내리기 직전 신호) -->
+    <uses-permission android:name="pleos.car.permission.CAR_SEATS" />
+    <!-- 계기판 경고등 조회(getTelltalesInfo): 좌우 방향지시등 표시가 동시에 켜지면 비상등으로 판단 -->
     <uses-permission android:name="pleos.car.permission.CAR_SAFETY" />
+    <!-- Pleos FusedLocation: GPS·차량 센서를 합친 정밀 위치 -->
+    <uses-permission android:name="pleos.car.permission.FUSED_LOCATION" />
+    <!-- Pleos SpeechToText: "경유지로 넣을까요?"에 대한 "응/아니" (기기 내 인식) -->
+    <uses-permission android:name="pleos.car.permission.STT_SERVICE" />
 
     <!-- Pleos NaviHelper SDK: 현재 위치·목적지 조회, 경유지 추가 -->
     <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />

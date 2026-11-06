@@ -22,6 +22,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Switch
 import android.widget.TextView
+import dev.jamkkanman.app.car.CarGearSource
 import dev.jamkkanman.app.car.GleoBridge
 import dev.jamkkanman.app.car.LocationHub
 import dev.jamkkanman.app.car.NaviWatcher
@@ -32,6 +33,7 @@ import dev.jamkkanman.app.core.SafeSpot
 import dev.jamkkanman.app.core.Speech
 import dev.jamkkanman.app.core.StopEngine
 import dev.jamkkanman.app.core.Voice
+import dev.jamkkanman.app.core.VoiceAnswer
 import dev.jamkkanman.app.core.ZoneChecker
 import dev.jamkkanman.app.core.ZoneData
 import dev.jamkkanman.app.core.ZoneRepository
@@ -68,6 +70,7 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
     private lateinit var checker: ZoneChecker
     private lateinit var ledger: Ledger
     private lateinit var voice: Voice
+    private lateinit var answer: VoiceAnswer
     private lateinit var locations: LocationHub
     private lateinit var vehicle: VehicleWatcher
     private lateinit var navi: NaviWatcher
@@ -85,7 +88,7 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
 
     // 화면 요소
     private lateinit var gearChip: TextView
-    private lateinit var hazardChip: TextView
+    private lateinit var signalChip: TextView
     private lateinit var doorChip: TextView
     private lateinit var locationChip: TextView
     private lateinit var stateChip: TextView
@@ -127,7 +130,9 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
             voiceStatus = status
             log(status)
         }
-        locations = LocationHub(this)
+        answer = VoiceAnswer(this) { log(it) }
+        answer.onListeningChanged = { render() }
+        locations = LocationHub(this) { log(it) }
         navi = NaviWatcher(this, this)
         engine = StopEngine(
             checker = checker,
@@ -137,6 +142,7 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
             addWaypoint = { spot -> guideTo(spot) },
             onChange = { render() },
             log = { log(it) },
+            ask = { question, onAnswer -> askAloud(question, onAnswer) },
         )
         vehicle = VehicleWatcher(this, this)
 
@@ -146,6 +152,8 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
 
         vehicle.start()
         navi.start()
+        answer.start()
+        locations.startFused()
         requestLocationPermission()
         handler.post(ticker)
         render()
@@ -250,6 +258,8 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
         vehicle.release()
         navi.release()
         locations.stopDevice()
+        locations.stopFused()
+        answer.release()
         voice.shutdown()
         super.onDestroy()
     }
@@ -263,17 +273,19 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
 
     // ------------------------------------------------------------------ 권한
 
+    /** 실행 중 허용 권한: 위치(멈춘 자리), 차속(멈췄는지 판단) */
     private fun requestLocationPermission() {
-        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            locations.startDevice()
-        } else {
-            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), REQ_LOCATION)
-        }
+        val wanted = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION, CarGearSource.PERMISSION_SPEED)
+        val missing = wanted.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) locations.startDevice()
+        if (missing.isNotEmpty()) requestPermissions(missing.toTypedArray(), REQ_LOCATION)
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQ_LOCATION) locations.startDevice()
+        if (requestCode != REQ_LOCATION) return
+        locations.startDevice()
+        vehicle.onPermissionsChanged()
     }
 
     // ------------------------------------------------------------------ 차량·내비 신호
@@ -285,6 +297,12 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
     override fun onHazardLights(on: Boolean) = engine.onHazard(on)
 
     override fun onDoor(door: DoorValue, open: Boolean) = engine.onDoor(door, open)
+
+    override fun onSeatBelt(seat: String, buckled: Boolean) = engine.onSeatBelt(seat, buckled)
+
+    override fun onBrake(pressed: Boolean) = engine.onBrake(pressed)
+
+    override fun onSpeed(kph: Float) = engine.onSpeed(kph)
 
     override fun onVehicleLog(message: String) = log(message)
 
@@ -306,6 +324,24 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
     }
 
     override fun onNaviLog(message: String) = log(message)
+
+    /**
+     * 묻고(음성) 다 읽은 뒤 대답을 듣는다. 음성 인식을 못 쓰면 false (StopEngine이 묻지 않고 처리).
+     * 음성 안내가 끝났다는 신호가 안 와도 12초 뒤에는 듣기 시작한다.
+     */
+    private fun askAloud(question: String, onAnswer: (Boolean?) -> Unit): Boolean {
+        if (!answer.ready) return false
+        var started = false
+        val listen = {
+            if (!started) {
+                started = true
+                answer.listen(onAnswer)
+            }
+        }
+        voice.say(question) { listen() }
+        handler.postDelayed({ listen() }, ASK_LISTEN_FALLBACK_MS)
+        return true
+    }
 
     /** 경로 안내 중이면 경유지로, 아니면 목적지로 안내 */
     private fun guideTo(spot: SafeSpot): Boolean =
@@ -329,9 +365,9 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
 
     private fun render() {
         if (!built) return
-        val gear = engine.gear
-        val driving = gear == VehicleGear.GEAR_DRIVE || gear == VehicleGear.GEAR_REVERSE
-        driveOverlay.visibility = if (driving) View.VISIBLE else View.GONE
+        // 주행 중(차속 5km/h 이상, 차속을 모르면 기어 D·R)에는 화면을 가리고 음성으로만 안내한다.
+        // 기어 D에 브레이크를 밟고 멈춰 있으면 화면을 보여 준다 (내려 주는 순간 경고를 볼 수 있게)
+        driveOverlay.visibility = if (engine.moving) View.VISIBLE else View.GONE
         driveSpoken.text = engine.lastSpoken ?: "멈추면 그 자리를 확인해\n한 번만 음성으로 알려 드려요."
 
         renderChips()
@@ -345,9 +381,15 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
         if (gear == VehicleGear.GEAR_PARK) ui.styleChip(gearChip, Palette.SURFACE, Palette.TEXT)
         else ui.styleChip(gearChip, Palette.TEXT3, Palette.SURFACE)
 
-        hazardChip.text = if (engine.hazardOn) "비상등 켜짐" else "비상등"
-        if (engine.hazardOn) ui.styleChip(hazardChip, Palette.SURFACE, Palette.ORANGE)
-        else ui.styleChip(hazardChip, Palette.TEXT3, Palette.SURFACE)
+        // 안전벨트 칩: 비상등이 잡히면 비상등을 먼저 보여 준다
+        signalChip.text = when {
+            engine.hazardOn -> "비상등 켜짐"
+            engine.beltReleased -> "벨트 풀림"
+            engine.beltKnown -> "벨트 채움"
+            else -> "안전벨트"
+        }
+        if (engine.hazardOn || engine.beltReleased) ui.styleChip(signalChip, Palette.SURFACE, Palette.ORANGE)
+        else ui.styleChip(signalChip, Palette.TEXT3, Palette.SURFACE)
 
         doorChip.text = if (engine.doorOpen) "문 열림" else "문 닫힘"
         if (engine.doorOpen) ui.styleChip(doorChip, Palette.SURFACE, Palette.ORANGE)
@@ -399,7 +441,7 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
                 reasonText.text = if (reason != null) "$reason · 위치를 찾는 중" else ""
                 titleText.text = "멈추면 그 자리를 확인해요"
                 titleText.setTextColor(Palette.TEXT)
-                detailText.text = "기어 P · 비상등 · 문 열림 중 하나만 들어와도 바로 확인해요."
+                detailText.text = "기어 P · 안전벨트 풀림 · 문 열림 중 하나만 들어와도 바로 확인해요."
             }
             top != null -> {
                 mood = if (top.certain) StopMapView.Mood.WARN else StopMapView.Mood.MAYBE
@@ -467,7 +509,8 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
         }
         guideButton.tag = spot?.spot
         ui.setButtonEnabled(repeatButton, engine.lastSpoken != null)
-        spokenText.text = voiceStatus.substringAfterLast(" → ")
+        spokenText.text = if (answer.listening) "듣는 중 · ‘응’ 또는 ‘아니’로 답해 주세요"
+        else voiceLine(voiceStatus.substringAfterLast(" → "))
 
         map.update(fix, heading, top?.zone?.id, spot, mood)
     }
@@ -490,6 +533,15 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
             naviCaution?.takeIf { it.isNotBlank() }?.let { "내비: $it" },
         ).joinToString("\n")
         demoStrip.visibility = if (demoOpen) View.VISIBLE else View.GONE
+    }
+
+    /** 음성 상태 한 줄: 개발용 빌드는 엔진 이름까지, 제출용은 운전자에게 필요한 말만 */
+    private fun voiceLine(raw: String): String = when {
+        BuildConfig.DEBUG -> raw
+        raw.contains("화면으로만") -> raw
+        raw.contains("안내 중") -> "음성으로 안내하는 중"
+        raw.contains("오류") || raw.contains("실패") || raw.contains("불가") || raw.contains("설치 안 됨") -> "음성이 안 나오면 화면 안내를 봐 주세요"
+        else -> ""
     }
 
     private fun checkedTime(): String =
@@ -527,6 +579,8 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
 
         logText = ui.text(18, Palette.TEXT4, value = lastLog).apply {
             maxLines = 1
+            // 차량 신호 점검용 기록: 개발용 빌드에서만 바로 보이고, 제출용(release)에서는 설정에서 켠다
+            visibility = if (BuildConfig.DEBUG) View.VISIBLE else View.GONE
             setOnClickListener {
                 logExpanded = !logExpanded
                 showLog()
@@ -562,10 +616,10 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
 
         val chips = ui.horizontal().apply { setPadding(ui.px(24), ui.px(24), ui.px(24), 0) }
         gearChip = ui.chip()
-        hazardChip = ui.chip()
+        signalChip = ui.chip()
         doorChip = ui.chip()
         locationChip = ui.chip()
-        for ((i, chip) in listOf(gearChip, hazardChip, doorChip, locationChip).withIndex()) {
+        for ((i, chip) in listOf(gearChip, signalChip, doorChip, locationChip).withIndex()) {
             chip.elevation = ui.pxf(3)
             chips.addView(chip, ui.lp(WRAP, WRAP, start = if (i == 0) 0 else 10))
         }
@@ -722,12 +776,31 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
             }
         }
         card.addView(switchRow("도착 전에 세울 곳을 경유지로", waypointSwitch))
-        card.addView(ui.text(24, Palette.TEXT3, value = "목적지 앞이 금지구역이면 도착 700m 전에 알려 주고, 가까운 세울 곳을 내비 경유지로 넣어요.").apply { setLineSpacing(ui.pxf(8), 1f) }, ui.lp(MATCH, WRAP, top = 10))
+        card.addView(ui.text(24, Palette.TEXT3, value = "목적지 앞이 금지구역이면 도착 700m 전에 알려 주고, 가까운 세울 곳을 경유지로 넣을지 음성으로 물어요. ‘응’이라고 하면 넣어요.").apply { setLineSpacing(ui.pxf(8), 1f) }, ui.lp(MATCH, WRAP, top = 10))
         destinationText = ui.text(22, Palette.TEXT4)
         card.addView(destinationText, ui.lp(MATCH, WRAP, top = 8))
+        card.addView(ui.divider())
+
+        val diagSwitch = Switch(this).apply {
+            isChecked = BuildConfig.DEBUG
+            setOnCheckedChangeListener { _, checked ->
+                logText.visibility = if (checked) View.VISIBLE else View.GONE
+            }
+        }
+        card.addView(switchRow("차량 신호 기록 보기", diagSwitch))
+        card.addView(ui.text(24, Palette.TEXT3, value = "기어·안전벨트·문 신호가 들어오는지 화면 맨 아래에 보여 줘요. 점검할 때만 켜 두세요.").apply { setLineSpacing(ui.pxf(8), 1f) }, ui.lp(MATCH, WRAP, top = 10))
 
         card.addView(ui.button("닫기", UiKit.ButtonStyle.SECONDARY) { dim.visibility = View.GONE }, ui.lp(MATCH, WRAP, top = 32))
-        dim.addView(card, FrameLayout.LayoutParams(ui.px(860), WRAP, Gravity.CENTER))
+        // 화면이 낮으면 설정 카드가 잘리지 않게 스크롤한다
+        val scroller = ScrollView(this).apply {
+            isVerticalScrollBarEnabled = false
+            isFillViewport = false
+            addView(card)
+        }
+        dim.addView(scroller, FrameLayout.LayoutParams(ui.px(860), WRAP, Gravity.CENTER).apply {
+            topMargin = ui.px(24)
+            bottomMargin = ui.px(24)
+        })
         return dim
     }
 
@@ -749,6 +822,11 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
         row.addView(ui.text(24, Palette.TEXT, bold = true, value = "시연"), ui.lp(WRAP, WRAP, end = 16))
         // 자주 누르는 버튼을 앞에 둔다 (창이 좁아도 바로 보이게)
         row.addView(ui.button("멈춤 신호", UiKit.ButtonStyle.PRIMARY, sizePx = 24, heightPx = 72) { engine.stopMoment("시연 정차") }, ui.lp(WRAP, WRAP, end = 10))
+        // 에뮬레이터 Virtual Console에는 안전벨트 조작이 없어, 실제 차의 신호(뒷좌석 벨트 채움 → 풀림)를 그대로 넣는다
+        row.addView(ui.button("안전벨트 풀림", UiKit.ButtonStyle.OUTLINE, sizePx = 24, heightPx = 72) {
+            log("시연: 뒷좌석 오른쪽 안전벨트 채움 → 풀림")
+            engine.demoBeltRelease()
+        }, ui.lp(WRAP, WRAP, end = 10))
         row.addView(ui.button("초기화", UiKit.ButtonStyle.OUTLINE, sizePx = 24, heightPx = 72) {
             engine.resetSession()
             log("초기화: 같은 자리 안내 기록을 지움")
@@ -816,5 +894,6 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
         private const val LOG_KEEP = 12
         private const val GLEO_COLD_START_MS = 2_500L
         private const val REQ_LOCATION = 2001
+        private const val ASK_LISTEN_FALLBACK_MS = 12_000L
     }
 }

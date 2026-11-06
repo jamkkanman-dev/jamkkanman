@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>강남구 정차 수요 지도</title>
+<meta name="description" content="잠깐만 · 지자체용 정차 수요 지도 시제품. 단속이 반복되는데 합법적으로 세울 곳이 없는 곳을 찾습니다.">
+<style>
+:root {
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --text: #131417;
+  --text2: #4a4f57;
+  --text3: #7a808a;
+  --line: #e3e6ea;
+  --road: #c9ced6;
+  --road-major: #aab1bc;
+  --accent: #1f6feb;
+  --park: #1a9b5a;
+  --school: #e07a10;
+  --pin: #131417;
+  --pin-text: #ffffff;
+  --heat-0: #fff3c4;
+  --heat-1: #ffc46b;
+  --heat-2: #f47a3b;
+  --heat-3: #d63a2f;
+  --heat-4: #8f1d2c;
+  --shadow: 0 1px 2px rgba(19,20,23,.06), 0 4px 16px rgba(19,20,23,.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1114; --surface: #181b20; --text: #eef0f3; --text2: #c3c8d0; --text3: #8b929c; --line: #2a2f37;
+    --road: #39404a; --road-major: #4c5561; --accent: #5b9dff; --park: #3ccf86; --school: #ffa24a;
+    --pin: #eef0f3; --pin-text: #0f1114;
+    --heat-0: #4a3b12; --heat-1: #8a5a14; --heat-2: #c56a24; --heat-3: #ec5a3c; --heat-4: #ffb4a6;
+    --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1114; --surface: #181b20; --text: #eef0f3; --text2: #c3c8d0; --text3: #8b929c; --line: #2a2f37;
+  --road: #39404a; --road-major: #4c5561; --accent: #5b9dff; --park: #3ccf86; --school: #ffa24a;
+  --pin: #eef0f3; --pin-text: #0f1114;
+  --heat-0: #4a3b12; --heat-1: #8a5a14; --heat-2: #c56a24; --heat-3: #ec5a3c; --heat-4: #ffb4a6;
+  --shadow: none;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+  font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1240px; margin: 0 auto; padding: 28px 24px 48px; }
+header { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 16px; margin-bottom: 20px; }
+h1 { font-size: 28px; line-height: 1.25; margin: 0; letter-spacing: -0.02em; }
+.badge { font-size: 12px; font-weight: 700; color: var(--accent); border: 1px solid var(--accent); border-radius: 99px; padding: 2px 10px; }
+.sub { flex-basis: 100%; color: var(--text2); margin: 0; }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.kpi { background: var(--surface); border-radius: 16px; padding: 16px 18px; box-shadow: var(--shadow); }
+.kpi b { display: block; font-size: 24px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.kpi span { color: var(--text3); font-size: 13px; }
+.main { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 16px; }
+.card { background: var(--surface); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; }
+.mapcard { position: relative; min-height: 560px; }
+canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+canvas.dragging { cursor: grabbing; }
+.maptools { position: absolute; top: 12px; right: 12px; display: flex; flex-direction: column; gap: 6px; }
+.maptools button, .layers label {
+  font: inherit; font-size: 13px; background: var(--surface); color: var(--text); border: 1px solid var(--line);
+  border-radius: 10px; padding: 6px 10px; cursor: pointer; box-shadow: var(--shadow);
+}
+.maptools button { width: 36px; height: 36px; padding: 0; font-size: 18px; }
+.layers { position: absolute; left: 12px; top: 12px; display: flex; flex-wrap: wrap; gap: 6px; max-width: calc(100% - 70px); }
+.layers label { display: inline-flex; align-items: center; gap: 6px; user-select: none; }
+.layers input { margin: 0; accent-color: var(--accent); }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.legend { position: absolute; left: 12px; bottom: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; font-size: 12px; color: var(--text2); box-shadow: var(--shadow); }
+.ramp { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin: 4px 0 2px; width: 160px; }
+.ramp i { flex: 1; }
+.ramp-labels { display: flex; justify-content: space-between; width: 160px; color: var(--text3); }
+.tip { position: absolute; pointer-events: none; background: var(--text); color: var(--bg); font-size: 12px; border-radius: 8px; padding: 6px 8px; display: none; max-width: 240px; }
+.list { display: flex; flex-direction: column; }
+.list h2 { font-size: 17px; margin: 0; padding: 18px 20px 4px; }
+.list p.note { margin: 0; padding: 0 20px 10px; color: var(--text3); font-size: 13px; }
+ol.cands { list-style: none; margin: 0; padding: 0 8px 8px; overflow: auto; max-height: 520px; }
+ol.cands li { display: grid; grid-template-columns: 30px 1fr auto; gap: 4px 10px; padding: 10px 12px; border-radius: 12px; cursor: pointer; }
+ol.cands li:hover, ol.cands li.on { background: var(--bg); }
+.num { width: 26px; height: 26px; border-radius: 50%; background: var(--pin); color: var(--pin-text); font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+.cname { font-weight: 700; line-height: 1.35; }
+.cmeta { grid-column: 2 / 4; color: var(--text3); font-size: 13px; }
+.ccount { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tag { display: inline-block; font-size: 11px; font-weight: 700; color: var(--school); border: 1px solid currentColor; border-radius: 6px; padding: 0 5px; margin-left: 4px; vertical-align: 1px; }
+section.text { margin-top: 16px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+section.text .card { padding: 18px 20px; }
+section.text h3 { margin: 0 0 6px; font-size: 15px; }
+section.text p, section.text li { color: var(--text2); font-size: 14px; margin: 0 0 6px; }
+section.text ul { padding-left: 18px; margin: 0; }
+footer { margin-top: 16px; color: var(--text3); font-size: 12px; }
+footer a { color: var(--text3); }
+@media (max-width: 900px) {
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .main, section.text { grid-template-columns: minmax(0, 1fr); }
+  .mapcard { min-height: 420px; height: 62vh; }
+  ol.cands { max-height: none; }
+}
+@media (max-width: 480px) {
+  .wrap { padding: 20px 16px 40px; }
+  h1 { font-size: 23px; }
+  .kpi b { font-size: 20px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>강남구 정차 수요 지도</h1><span class="badge">시제품</span>
+    <p class="sub">단속이 반복되는데 합법적으로 잠깐 세울 곳은 없는 곳. 안심 승하차 구역을 어디에 먼저 만들지 정하는 근거를 보여 주는 지자체용 화면입니다.</p>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="main">
+    <div class="card mapcard" id="mapcard">
+      <canvas id="map" aria-label="강남구 정차 수요 지도"></canvas>
+      <div class="layers">
+        <label><input type="checkbox" data-layer="heat" checked> 단속 기록</label>
+        <label><input type="checkbox" data-layer="parking" checked><span class="dot" style="background:var(--park)"></span> 공영주차장</label>
+        <label><input type="checkbox" data-layer="school" checked><span class="dot" style="border:2px solid var(--school)"></span> 어린이보호구역</label>
+      </div>
+      <div class="maptools">
+        <button type="button" id="zin" aria-label="확대">+</button>
+        <button type="button" id="zout" aria-label="축소">−</button>
+        <button type="button" id="zfit" aria-label="전체 보기" style="font-size:13px">전체</button>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div class="tip" id="tip"></div>
+    </div>
+
+    <div class="card list">
+      <h2>안심 승하차 구역 후보지</h2>
+      <p class="note" id="candnote"></p>
+      <ol class="cands" id="cands"></ol>
+    </div>
+  </div>
+
+  <section class="text">
+    <div class="card">
+      <h3>어떻게 찾았나</h3>
+      <ul id="method"></ul>
+    </div>
+    <div class="card">
+      <h3>실제 서비스에서는</h3>
+      <p>잠깐만은 운전자가 동의한 경우에만 금지구역 경고가 울린 자리를 약 50m 칸·시간대·요일로 남깁니다. 정확한 위치와 차량 정보는 차 밖으로 나가지 않습니다.</p>
+      <p>이 기록이 쌓이면 단속 기록(위반이 일어난 뒤)보다 앞선 '세우려던 순간'의 수요를 시간대별로 볼 수 있어, 하원 시간 같은 특정 시간에만 필요한 승하차 구역도 찾을 수 있습니다.</p>
+    </div>
+    <div class="card">
+      <h3>한계</h3>
+      <ul>
+        <li>단속 기록은 위치가 있는 기록만 공개되어 실제 단속 건수보다 적습니다.</li>
+        <li>단속 기록에는 장시간 주차도 섞여 있어 '잠깐 정차' 수요만 따로 뽑은 것은 아닙니다.</li>
+        <li>공영주차장 외 민영 주차장·건물 부설 주차장은 넣지 않았습니다. 후보지는 현장 확인이 필요합니다.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer id="footer"></footer>
+</div>
+
+<script src="demand.js"></script>
+<script>
+(function () {
+  const D = window.DEMAND;
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n) => n.toLocaleString("ko-KR");
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  if (!D) {
+    $("kpis").textContent = "demand.js를 찾을 수 없습니다. tools/build_demand_map.py를 먼저 실행하세요.";
+    return;
+  }
+
+  // ---------------------------------------------------------------- 숫자
+  const nearSchool = D.candidates.filter((c) => c.school).length;
+  const kpis = [
+    [fmt(D.totalRecords) + "건", `위치가 있는 단속 기록 · ${D.period}`],
+    [Math.round(D.top10Share * 100) + "%", `상위 10% 칸(100m)에 몰린 비율`],
+    [D.candidates.length + "곳", `후보지 · ${D.noParkingNearM}m 안 공영주차장 없음`],
+    ["238,463건", "강남구 2025년 불법 주정차 단속 · 서울 25개 구 중 1위"],
+  ];
+  $("kpis").innerHTML = kpis.map(([b, s]) => `<div class="kpi"><b>${b}</b><span>${s}</span></div>`).join("");
+  $("candnote").textContent = `단속 건수 순 · 어린이보호구역 300m 안 ${nearSchool}곳 · 누르면 지도에서 보여 줘요`;
+
+  $("method").innerHTML = [
+    `서울시 불법주정차 단속 정보(${D.period}) 중 강남구 기록을 ${D.cellM}m 칸으로 묶었습니다.`,
+    `칸마다 가장 가까운 공영주차장까지 거리를 재서, ${D.noParkingNearM}m 안에 없는 칸만 남겼습니다.`,
+    `남은 칸을 단속 건수 순으로 정렬해 상위 ${D.candidates.length}곳을 후보지로 골랐습니다.`,
+    `이름은 가까운 버스정류장·교차로에서 붙였고, 강남구 경계는 소방용수시설 주소로 나눴습니다.`,
+  ].map((t) => `<li>${t}</li>`).join("");
+
+  $("footer").innerHTML = [
+    "출처: 서울 열린데이터광장 「서울시 불법주정차 단속 정보」(OA-22190, 공공누리 제1유형) · 공공데이터포털 「전국주차장정보표준데이터」 · 「전국어린이보호구역표준데이터」",
+    "· 국토교통부 국가교통정보센터 「전국표준노드링크」(지도) · 서울시 교통정보 「불법 주·정차 단속 실적」(2026.10.15 게시, 연간 건수)",
+    "<br>만든 방법: <code>tools/build_demand_map.py</code> · 잠깐만 (Pleos Connect 차량 앱) 시제품",
+  ].join(" ");
+
+  // ---------------------------------------------------------------- 후보지 목록
+  const list = $("cands");
+  list.innerHTML = D.candidates.map((c) => `
+    <li data-rank="${c.rank}">
+      <span class="num">${c.rank}</span>
+      <span class="cname">${c.dong} · ${c.name}${c.school ? '<span class="tag">어린이보호구역</span>' : ""}</span>
+      <span class="ccount">${fmt(c.count)}건</span>
+      <span class="cmeta">공영주차장 ${fmt(c.parkingM)}m (${c.parking}) · 칸 안 금지구역 ${c.zones}곳</span>
+    </li>`).join("");
+
+  // ---------------------------------------------------------------- 지도
+  const canvas = $("map");
+  const card = $("mapcard");
+  const ctx = canvas.getContext("2d");
+  const layers = { heat: true, parking: true, school: true };
+  let W = 0, H = 0, dpr = 1;
+  let scale = 1, ox = 0, oy = 0; // 화면 x = ox + mx*scale, 화면 y = oy - my*scale
+  let selected = null;
+  const [bx0, by0, bx1, by1] = D.bbox;
+  const counts = D.grid.map((g) => g[2]).sort((a, b) => a - b);
+  const q = (p) => counts[Math.min(counts.length - 1, Math.floor(p * counts.length))];
+  const breaks = [q(0.5), q(0.75), q(0.9), q(0.97)];
+
+  function heatColor(n) {
+    let i = 0;
+    while (i < breaks.length && n > breaks[i]) i++;
+    return css(`--heat-${i}`);
+  }
+
+  $("legend").innerHTML = `<div>100m 칸 단속 건수 (${D.period})</div>
+    <div class="ramp">${[0, 1, 2, 3, 4].map((i) => `<i style="background:var(--heat-${i})"></i>`).join("")}</div>
+    <div class="ramp-labels"><span>적음</span><span>${fmt(breaks[3])}건+</span></div>`;
+
+  function fit() {
+    const pad = 24;
+    scale = Math.min((W - pad * 2) / (bx1 - bx0), (H - pad * 2) / (by1 - by0));
+    ox = (W - (bx1 - bx0) * scale) / 2 - bx0 * scale;
+    oy = (H + (by1 - by0) * scale) / 2 + by0 * scale;
+  }
+
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    const r = card.getBoundingClientRect();
+    const first = W === 0;
+    W = r.width; H = r.height;
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    if (first) fit();
+    draw();
+  }
+
+  const sx = (x) => ox + x * scale;
+  const sy = (y) => oy - y * scale;
+
+  function draw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = css("--surface");
+    ctx.fillRect(0, 0, W, H);
+
+    // 도로
+    const road = css("--road"), major = css("--road-major");
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    for (const r of D.roads) {
+      const rank = r[0], lanes = r[1];
+      const isMajor = rank <= 104 || lanes >= 3;
+      ctx.strokeStyle = isMajor ? major : road;
+      ctx.lineWidth = Math.max(0.6, Math.min(6, (isMajor ? 1.6 : 0.8) * Math.sqrt(scale * 2)));
+      ctx.beginPath();
+      ctx.moveTo(sx(r[2]), sy(r[3]));
+      for (let i = 4; i < r.length; i += 2) ctx.lineTo(sx(r[i]), sy(r[i + 1]));
+      ctx.stroke();
+    }
+
+    // 단속 기록 칸
+    if (layers.heat) {
+      const s = D.cellM * scale;
+      ctx.globalAlpha = 0.82;
+      for (const [cx, cy, n] of D.grid) {
+        ctx.fillStyle = heatColor(n);
+        ctx.fillRect(sx(cx * D.cellM), sy((cy + 1) * D.cellM), Math.max(1, s - 0.5), Math.max(1, s - 0.5));
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // 어린이보호구역
+    if (layers.school) {
+      ctx.strokeStyle = css("--school"); ctx.lineWidth = 1.5;
+      for (const [, x, y, r] of D.schools) {
+        ctx.beginPath(); ctx.arc(sx(x), sy(y), Math.max(3, r * scale), 0, Math.PI * 2); ctx.stroke();
+      }
+    }
+
+    // 공영주차장
+    if (layers.parking) {
+      ctx.fillStyle = css("--park");
+      const pr = Math.max(2.5, Math.min(6, 3 * Math.sqrt(scale * 4)));
+      for (const [, x, y] of D.parking) {
+        ctx.beginPath(); ctx.arc(sx(x), sy(y), pr, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    // 후보지
+    const pin = css("--pin"), pinText = css("--pin-text"), accent = css("--accent");
+    ctx.font = "700 12px system-ui, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (const c of D.candidates) {
+      const x = sx(c.x), y = sy(c.y), on = selected === c.rank;
+      if (on) {
+        ctx.strokeStyle = accent; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(x, y, 18, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(x, y, D.noParkingNearM * scale, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      ctx.fillStyle = pin;
+      ctx.beginPath(); ctx.arc(x, y, 12, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = pinText; ctx.fillText(String(c.rank), x, y + 0.5);
+    }
+  }
+
+  function zoomAt(f, px, py) {
+    const ns = Math.max(0.03, Math.min(8, scale * f));
+    const k = ns / scale;
+    ox = px - (px - ox) * k; oy = py - (py - oy) * k; scale = ns;
+    draw();
+  }
+
+  function select(rank, center) {
+    selected = rank;
+    for (const li of list.children) li.classList.toggle("on", Number(li.dataset.rank) === rank);
+    const c = D.candidates.find((v) => v.rank === rank);
+    if (c && center) {
+      const target = Math.max(scale, 0.9);
+      scale = target; ox = W / 2 - c.x * scale; oy = H / 2 + c.y * scale;
+    }
+    draw();
+  }
+
+  function hit(px, py) {
+    for (const c of D.candidates) if (Math.hypot(sx(c.x) - px, sy(c.y) - py) <= 14) return c;
+    return null;
+  }
+
+  // 끌기·확대 (마우스·터치)
+  const pointers = new Map();
+  let last = null, pinch = null, moved = false;
+  canvas.addEventListener("pointerdown", (e) => {
+    canvas.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+    moved = false;
+    if (pointers.size === 1) last = { x: e.offsetX, y: e.offsetY };
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) };
+    }
+    canvas.classList.add("dragging");
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    const tip = $("tip");
+    if (!pointers.has(e.pointerId)) {
+      const c = hit(e.offsetX, e.offsetY);
+      if (c) {
+        tip.style.display = "block";
+        tip.style.left = Math.min(W - 250, e.offsetX + 14) + "px"; tip.style.top = (e.offsetY + 14) + "px";
+        tip.textContent = `${c.rank}. ${c.dong} · ${c.name} — 단속 ${fmt(c.count)}건, 공영주차장 ${fmt(c.parkingM)}m`;
+        canvas.style.cursor = "pointer";
+      } else { tip.style.display = "none"; canvas.style.cursor = ""; }
+      return;
+    }
+    pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+    if (pointers.size === 2 && pinch) {
+      const [a, b] = [...pointers.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      zoomAt(d / pinch.d, (a.x + b.x) / 2, (a.y + b.y) / 2);
+      pinch.d = d; moved = true;
+    } else if (pointers.size === 1 && last) {
+      const dx = e.offsetX - last.x, dy = e.offsetY - last.y;
+      if (Math.abs(dx) + Math.abs(dy) > 2) moved = true;
+      ox += dx; oy += dy; last = { x: e.offsetX, y: e.offsetY };
+      draw();
+    }
+  });
+  function up(e) {
+    if (!moved && pointers.size === 1) {
+      const c = hit(e.offsetX, e.offsetY);
+      if (c) {
+        select(c.rank, false);
+        const li = list.querySelector(`li[data-rank="${c.rank}"]`);
+        if (li) li.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
+    }
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) pinch = null;
+    if (pointers.size === 0) { last = null; canvas.classList.remove("dragging"); }
+    else last = [...pointers.values()][0];
+  }
+  canvas.addEventListener("pointerup", up);
+  canvas.addEventListener("pointercancel", up);
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    zoomAt(Math.exp(-e.deltaY * 0.0015), e.offsetX, e.offsetY);
+  }, { passive: false });
+
+  $("zin").onclick = () => zoomAt(1.5, W / 2, H / 2);
+  $("zout").onclick = () => zoomAt(1 / 1.5, W / 2, H / 2);
+  $("zfit").onclick = () => { fit(); draw(); };
+  for (const box of document.querySelectorAll("[data-layer]")) {
+    box.addEventListener("change", () => { layers[box.dataset.layer] = box.checked; draw(); });
+  }
+  list.addEventListener("click", (e) => {
+    const li = e.target.closest("li");
+    if (li) select(Number(li.dataset.rank), true);
+  });
+
+  new ResizeObserver(resize).observe(card);
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
+})();
+</script>
+</body>
+</html>
