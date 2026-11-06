@@ -29,8 +29,10 @@ import dev.jamkkanman.app.car.LocationHub
 import dev.jamkkanman.app.car.NaviWatcher
 import dev.jamkkanman.app.car.VehicleWatcher
 import dev.jamkkanman.app.core.CheckResult
+import dev.jamkkanman.app.core.Geo
 import dev.jamkkanman.app.core.Ledger
 import dev.jamkkanman.app.core.SafeSpot
+import dev.jamkkanman.app.core.SpotHint
 import dev.jamkkanman.app.core.Speech
 import dev.jamkkanman.app.core.StopEngine
 import dev.jamkkanman.app.core.Voice
@@ -520,9 +522,10 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
             }
         }
 
-        // 세울 곳: 확인 결과가 있으면 그 기준, 없으면 지금 위치 기준
+        // 세울 곳: 도착 전 안내 중이면 목적지 근처, 확인 결과가 있으면 그 기준, 없으면 지금 위치 기준
         val fix = result?.fix ?: locations.current()
-        val spot = result?.spot ?: fix?.let { checker.nearestSpot(it.lat, it.lon) }
+        val arrivalSpot = arrival?.spot
+        val spot = arrivalSpot ?: result?.spot ?: fix?.let { checker.nearestSpot(it.lat, it.lon) }
         val spotOutside = fix != null && !checker.covers(fix.lat, fix.lon)
         if (spot == null) {
             spotLabel.text = "세울 수 있는 곳"
@@ -530,9 +533,14 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
             spotDetail.text = if (spotOutside) "세울 곳 데이터도 ${data.region}만 들어 있어요" else "공공데이터 기준 · ${data.region}"
             ui.setButtonEnabled(guideButton, false)
         } else {
-            spotLabel.text = if (top != null) "대신 세울 수 있는 곳" else "가까운 세울 수 있는 곳"
+            spotLabel.text = when {
+                arrivalSpot != null -> "목적지 근처 세울 수 있는 곳"
+                top != null -> "대신 세울 수 있는 곳"
+                else -> "가까운 세울 수 있는 곳"
+            }
             spotName.text = spot.spot.name
-            spotDetail.text = listOf(Speech.metersShort(spot.distanceM), spot.spot.note)
+            val away = Speech.metersShort(spot.distanceM)
+            spotDetail.text = listOf(if (arrivalSpot != null) "목적지에서 $away" else away, spot.spot.note)
                 .filter { it.isNotBlank() }.joinToString(" · ")
             ui.setButtonEnabled(guideButton, true)
         }
@@ -541,7 +549,12 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
         spokenText.text = if (answer.listening) "듣는 중 · ‘응’ 또는 ‘아니’로 답해 주세요"
         else voiceLine(voiceStatus.substringAfterLast(" → "))
 
-        map.update(fix, heading, top?.zone?.id, spot, mood)
+        // 지도 점선·거리 표시는 내 차 기준이라, 목적지 근처 세울 곳은 내 차에서 다시 잰다 (멀면 지도에 잇지 않는다)
+        val mapSpot = if (arrivalSpot == null) spot else fix?.let {
+            val d = Geo.distanceM(it.lat, it.lon, arrivalSpot.spot.lat, arrivalSpot.spot.lon)
+            if (d <= MAP_SPOT_MAX_M) SpotHint(arrivalSpot.spot, d) else null
+        }
+        map.update(fix, heading, top?.zone?.id, mapSpot, mood)
     }
 
     private fun renderSide() {
@@ -926,5 +939,7 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
         private const val ASK_LISTEN_FALLBACK_MS = 12_000L
         /** 도착 전 안내 카드를 대답 뒤에도 이만큼 보여 준다 */
         private const val ARRIVAL_CARD_MS = 60_000L
+        /** 지도에 내 차 → 세울 곳 점선을 그리는 최대 거리 */
+        private const val MAP_SPOT_MAX_M = 800.0
     }
 }
