@@ -133,7 +133,7 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
             voiceStatus = status
             log(status)
         }
-        answer = VoiceAnswer(this) { log(it) }
+        answer = VoiceAnswer(this, BuildConfig.PLEOS_CLIENT_ID, BuildConfig.PLEOS_CLIENT_SECRET) { log(it) }
         answer.onListeningChanged = { render() }
         locations = LocationHub(this) { log(it) }
         navi = NaviWatcher(this, this)
