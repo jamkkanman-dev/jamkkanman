@@ -91,6 +91,10 @@ class VoiceAnswer(
 
     fun start() {
         if (stt != null) return
+        if (!ASK_BY_VOICE) {
+            log("음성 대답: 기본 꺼짐 (에뮬레이터에서 인식을 확인하기 전) → 묻지 않고 설정대로 경유지를 넣음")
+            return
+        }
         val next = modes.removeFirstOrNull() ?: run {
             log("음성 대답 사용 불가: 쓸 수 있는 인식 방식이 없음 → 묻지 않고 설정대로 처리")
             return
@@ -241,5 +245,11 @@ class VoiceAnswer(
         const val LISTEN_MS = 6_000L
         /** 서버 인식(HYBRID) 사용 여부: Pleos STT SDK 승인 전이라 꺼 둔다 */
         const val SERVER_MODES_OPEN = false
+
+        /**
+         * 도착 전에 "경유지로 넣을까요?"라고 묻고 대답을 들을지. 에뮬레이터에서 인식이 시작되지 않아 확인하지 못했으므로
+         * 기본은 끄고, 주행 중 조작이 없도록 설정(도착 전에 세울 곳을 경유지로)대로 바로 넣는다. 실차에서 확인되면 켠다.
+         */
+        const val ASK_BY_VOICE = false
     }
 }

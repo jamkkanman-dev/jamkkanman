@@ -481,8 +481,12 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
                 reasonText.text = "${reason ?: "정차"} · ${checkedTime()}"
                 titleText.text = if (top.certain) top.zone.type.title else "${top.zone.type.place} ${top.zone.type.range}일 수 있어요"
                 titleText.setTextColor(if (top.certain) Palette.RED else Palette.TEXT)
-                val lines = mutableListOf("${top.zone.type.risk}이에요 · 과태료 ${Speech.won(top.zone.type.fineAt(result.hour))}")
-                if (top.certain && top.exitM in 0.5..12.0) lines += "약 ${Speech.metersShort(top.exitM + 1.0)}만 옮기면 범위 밖이에요"
+                val lines = mutableListOf("${top.zone.type.risk}이에요 · 과태료 ${Speech.won(top.zone.type.fineAt(result.hour))}" +
+                    (top.zone.type.fineNote?.let { " ($it)" } ?: ""))
+                if (top.certain && top.exitM in 0.5..12.0) {
+                    lines += if (reason == StopEngine.BELT_REASON) "옮기려면 안전벨트를 다시 매고 약 ${Speech.metersShort(top.exitM + 1.0)} 옮겨 주세요"
+                    else "약 ${Speech.metersShort(top.exitM + 1.0)}만 옮기면 범위 밖이에요"
+                }
                 result.risk?.let { r -> Speech.riskLine(r)?.let { lines += it } }
                 detailText.text = lines.joinToString("\n")
             }
@@ -818,7 +822,7 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
             }
         }
         card.addView(switchRow("도착 전에 세울 곳을 경유지로", waypointSwitch))
-        card.addView(ui.text(24, Palette.TEXT3, value = "목적지 앞이 금지구역이면 도착 700m 전에 알려 주고, 가까운 세울 곳을 경유지로 넣을지 음성으로 물어요. ‘응’이라고 하면 넣어요.").apply { setLineSpacing(ui.pxf(8), 1f) }, ui.lp(MATCH, WRAP, top = 10))
+        card.addView(ui.text(24, Palette.TEXT3, value = "목적지 앞이 금지구역이면 도착 700m 전에 음성으로 알려 주고, 가까운 세울 곳을 경유지로 바로 넣어요. 주행 중에는 따로 누를 것이 없어요.").apply { setLineSpacing(ui.pxf(8), 1f) }, ui.lp(MATCH, WRAP, top = 10))
         destinationText = ui.text(22, Palette.TEXT4)
         card.addView(destinationText, ui.lp(MATCH, WRAP, top = 8))
         card.addView(ui.divider())

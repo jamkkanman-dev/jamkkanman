@@ -22,8 +22,9 @@ class ZoneBasicsTest {
     }
 
     @Test
-    fun `과태료는 승용차 기준`() {
-        assertEquals(80_000, ZoneType.HYDRANT.fineAt(14))
+    fun `과태료는 승용차 기준 (소화전은 안전표지가 없을 때 기준, 8만 원은 따로 알림)`() {
+        assertEquals(40_000, ZoneType.HYDRANT.fineAt(14))
+        assertEquals("안전표지가 있으면 8만 원", ZoneType.HYDRANT.fineNote)
         assertEquals(40_000, ZoneType.CORNER.fineAt(14))
         assertEquals(40_000, ZoneType.BUS_STOP.fineAt(14))
         assertEquals(40_000, ZoneType.CROSSWALK.fineAt(14))

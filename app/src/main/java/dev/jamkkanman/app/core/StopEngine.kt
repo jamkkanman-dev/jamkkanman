@@ -226,7 +226,7 @@ class StopEngine(
         val moved = settlePending(result, fix, now)
         val top = result.top
         if (top != null) {
-            val text = Speech.warning(top, result.spot, result.hour, result.risk)
+            val text = Speech.warning(top, result.spot, result.hour, result.risk, belt = reason == BELT_REASON)
             speak(text)
             ledger.recordWarning()
             ledger.appendDemand("warn", top.zone.type, fix.lat, fix.lon)

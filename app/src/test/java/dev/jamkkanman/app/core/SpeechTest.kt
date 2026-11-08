@@ -44,10 +44,25 @@ class SpeechTest {
         val spot = SpotHint(SafeSpot("p", SpotKind.PUBLIC_PARKING, "공영주차장", 0.0, 0.0, "", ""), 120.0)
         val text = Speech.warning(hit(ZoneType.BUS_STOP, 3.0), spot, hour = 14)
         assertEquals(
-            "버스정류장 10미터 안이에요. 1분이면 신고될 수 있는 곳이고, 과태료는 4만 원이에요. " +
+            "버스정류장 10미터 안이에요. 주정차 금지구역이고, 과태료는 4만 원이에요. " +
                 "약 10미터만 옮기면 범위 밖이에요. 공영주차장까지 120미터예요.",
             text,
         )
+    }
+
+    @Test
+    fun `안전벨트가 풀려 멈춘 경우 문 열기 전 확인, 옮길 때는 벨트를 다시 매라고 한다`() {
+        val text = Speech.warning(hit(ZoneType.BUS_STOP, 3.0), null, hour = 14, belt = true)
+        assertTrue(text.startsWith("문 열기 전에 확인해 주세요. 버스정류장 10미터 안이에요."))
+        assertTrue(text.contains("옮기려면 안전벨트를 다시 맨 뒤 약 10미터 옮겨 주세요."))
+        assertFalse(text.contains("만 옮기면"))
+    }
+
+    @Test
+    fun `소화전은 '신고된다'고 하지 않고 안전표지가 있을 때 과태료를 덧붙인다`() {
+        val text = Speech.warning(hit(ZoneType.HYDRANT, 2.0), null, hour = 14)
+        assertTrue(text.contains("주정차 금지구역이고, 과태료는 4만 원, 안전표지가 있으면 8만 원이에요."))
+        assertFalse(text.contains("신고"))
     }
 
     @Test

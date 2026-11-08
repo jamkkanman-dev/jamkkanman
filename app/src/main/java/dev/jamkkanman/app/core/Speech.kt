@@ -20,14 +20,22 @@ object Speech {
     /** 음성으로 읽을 이름: 괄호 안 설명은 빼고 읽는다 */
     fun spokenName(name: String): String = name.replace(Regex("\\s*\\([^)]*\\)"), "").trim()
 
-    fun warning(hit: ZoneHit, spot: SpotHint?, hour: Int, risk: Risk? = null): String {
+    /**
+     * 정차 순간 안내. [belt]는 안전벨트가 풀려서 멈춘 경우: 곧 내리려는 순간이라 문 열기 전에 확인하게 하고,
+     * 벨트를 푼 채로 차를 움직이지 않도록 옮길 때는 벨트를 다시 매라고 말한다.
+     */
+    fun warning(hit: ZoneHit, spot: SpotHint?, hour: Int, risk: Risk? = null, belt: Boolean = false): String {
         val type = hit.zone.type
         val sb = StringBuilder()
+        if (belt) sb.append("문 열기 전에 확인해 주세요. ")
         sb.append(if (hit.certain) "${type.spoken}이에요. " else "${type.spoken}일 수 있어요. ")
-        sb.append("${type.risk}이고, 과태료는 ${won(type.fineAt(hour))}이에요. ")
+        sb.append("${type.risk}이고, 과태료는 ${won(type.fineAt(hour))}${type.fineNote?.let { ", $it" } ?: ""}이에요. ")
         if (risk?.cctv != null) sb.append("단속 카메라도 있는 곳이에요. ")
         if (hit.certain && hit.exitM in 0.5..12.0) {
-            sb.append("약 ${meters(hit.exitM + 1.0)}만 옮기면 범위 밖이에요. ")
+            sb.append(
+                if (belt) "옮기려면 안전벨트를 다시 맨 뒤 약 ${meters(hit.exitM + 1.0)} 옮겨 주세요. "
+                else "약 ${meters(hit.exitM + 1.0)}만 옮기면 범위 밖이에요. "
+            )
         }
         if (spot != null) {
             sb.append("${spokenName(spot.spot.name)}까지 ${meters(spot.distanceM)}예요.")

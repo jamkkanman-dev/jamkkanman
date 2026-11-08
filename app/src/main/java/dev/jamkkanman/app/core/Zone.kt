@@ -1,7 +1,9 @@
 package dev.jamkkanman.app.core
 
 /**
- * 주정차 금지구역. 소화전·교차로 모퉁이·버스정류장·횡단보도는 주민신고제 대상(행정안전부, 정책브리핑 2023.8.10).
+ * 주정차 금지구역 (도로교통법 제32조). 주민신고는 조건이 있어(안전표지가 있는 소화전, 정지선~횡단보도, 초등학교 정문 앞 등,
+ * 안전신문고 신고기준) 표지·노면표시를 모르는 이 앱은 '신고된다'고 말하지 않고 '주정차 금지구역'으로만 안내한다.
+ * 소화전 과태료는 안전표지가 있으면 8만 원, 없으면 일반 위반과 같은 4만 원이라 4만 원으로 셈하고 8만 원은 따로 알린다.
  * 어린이보호구역은 2021.10.21부터 주정차 전면 금지, 오전 8시~오후 8시 과태료 12만 원(내 손안에 서울 2021.10.27).
  * 과태료는 승용차 기준. 인도(보도) 정차는 GPS만으로 판별할 수 없어 이 버전에서는 다루지 않는다.
  */
@@ -16,7 +18,7 @@ enum class ZoneType(
     val radiusM: Double,
     private val fineWon: Int,
 ) {
-    HYDRANT("소화전", "5m 안", "5미터 안", 5.0, 80_000),
+    HYDRANT("소화전", "5m 안", "5미터 안", 5.0, 40_000),
     CORNER("교차로 모퉁이", "5m 안", "5미터 안", 5.0, 40_000),
     BUS_STOP("버스정류장", "10m 안", "10미터 안", 10.0, 40_000),
     CROSSWALK("횡단보도", "10m 안", "10미터 안", 10.0, 40_000),
@@ -29,7 +31,10 @@ enum class ZoneType(
     val spoken: String get() = "$place $spokenRange"
 
     /** 왜 안 되는지 한마디 */
-    val risk: String get() = if (this == SCHOOL_ZONE) "주정차가 전면 금지된 곳" else "1분이면 신고될 수 있는 곳"
+    val risk: String get() = if (this == SCHOOL_ZONE) "주정차가 전면 금지된 곳" else "주정차 금지구역"
+
+    /** 과태료가 조건에 따라 더 높아지는 경우 덧붙이는 말 */
+    val fineNote: String? get() = if (this == HYDRANT) "안전표지가 있으면 8만 원" else null
 
     /** 어린이보호구역 과태료 가중(3배)은 오전 8시~오후 8시. 그 밖의 시간은 일반 주정차 위반과 같게 안내한다. */
     fun fineAt(hour: Int): Int = if (this == SCHOOL_ZONE && hour !in 8..19) 40_000 else fineWon
