@@ -535,6 +535,7 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
             spotLabel.text = "세울 수 있는 곳"
             spotName.text = if (spotOutside) "이 지역은 아직 찾을 수 없어요" else "600m 안에 없어요"
             spotDetail.text = if (spotOutside) "세울 곳 데이터도 ${data.region}만 들어 있어요" else "공공데이터 기준 · ${data.region}"
+            guideButton.text = "여기로 안내"
             ui.setButtonEnabled(guideButton, false)
         } else {
             spotLabel.text = when {
@@ -546,7 +547,10 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
             val away = Speech.metersShort(spot.distanceM)
             spotDetail.text = listOf(if (arrivalSpot != null) "목적지에서 $away" else away, spot.spot.note)
                 .filter { it.isNotBlank() }.joinToString(" · ")
-            ui.setButtonEnabled(guideButton, true)
+            // 도착 전 안내에서 이미 경유지로 넣었으면 같은 곳을 또 넣지 않도록 버튼을 끈다
+            val waypointDone = arrivalSpot != null && arrival?.state == StopEngine.ArrivalState.ADDED
+            guideButton.text = if (waypointDone) "경유지에 넣음" else "여기로 안내"
+            ui.setButtonEnabled(guideButton, !waypointDone)
         }
         guideButton.tag = spot?.spot
         ui.setButtonEnabled(repeatButton, engine.lastSpoken != null)
@@ -904,8 +908,8 @@ class MainActivity : Activity(), VehicleWatcher.Events, NaviWatcher.Events {
             DestinationInfo(
                 latitude = target.lat,
                 longitude = target.lon,
-                name = target.label,
-                address = target.label,
+                name = "대치동 학원가 (시연)",
+                address = "대치동 학원가 (시연)",
                 remainDistance = 500,
                 remainTime = 90,
                 tollFare = 0,
