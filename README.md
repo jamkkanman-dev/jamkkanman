@@ -4,6 +4,7 @@
 
 - 데이터 범위: 서울 강남구 전체 (금지구역 15,423곳, 단속 CCTV 358대). 시연 지점은 대치동 학원가의 실제 지점
 - 제출 APK: [`apk/잠깐만_잠깐만_release.apk`](apk/) (release 빌드, 서명 포함)
+- 시연 영상 (3분 31초, Pleos Connect Emulator 화면 녹화): https://youtu.be/j7V7T-h47bw
 
 ## 주요 기능
 
