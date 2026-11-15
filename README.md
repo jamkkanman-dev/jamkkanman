@@ -1,6 +1,6 @@
 # 잠깐만
 
-차를 잠깐 세우는 순간을 차가 먼저 알아채, 1분만 세워도 신고되는 주정차 금지구역이면 한 번만 음성으로 알려 주고 바로 옆 세울 수 있는 자리로 안내하는 Pleos Connect 차량 앱입니다.
+차가 멈추는 순간(기어 P·안전벨트 풀림·문 열림), 그 자리가 소화전·횡단보도·어린이보호구역 같은 주정차 금지구역이면 내리기 전에 한 번 음성으로 알리고 가까운 공영주차장으로 안내하는 Pleos Connect 차량 앱입니다.
 
 - 데이터 범위: 서울 강남구 전체 (금지구역 15,423곳, 단속 CCTV 358대). 시연 지점은 대치동 학원가의 실제 지점
 - 제출 APK: [`apk/잠깐만_잠깐만_release.apk`](apk/) (release 빌드, 서명 포함)
@@ -189,7 +189,7 @@
 - Smartcar, 2025 State of Connected Car Apps 보도자료 (2025.2.3, 커넥티드 서비스 미가입 76%): https://www2020.theautochannel.com/news/2025/02/03/1488081-smartcar-report-highlights-disconnect-between-drivers-and-vehicle-connectivity-solutions.html
 - 산업일보, Pleos Connect 2028년 누적 약 700만 대 (2025.3.31): https://kidd.co.kr/news/241041
 - 더팩트, 현대차·기아 2024년 판매 실적 (2025.1.3): https://news.tf.co.kr/read/economy/2167349.htm
-- 연수구청, 안전신문고 불법주정차 신고기준: https://www.yeonsu.go.kr/main/part/traffic/help_phone.asp
+- 서울시 교통정보, 교통법규 위반 차량 「시민신고제」 운영 안내 (주민신고 대상 구역·1분 간격 사진 2장 기준): https://news.seoul.go.kr/traffic/archives/507047
 - 비즈워치, 휘슬 574만 명 (2025.7.15): https://news.bizwatch.co.kr/article/mobile/2025/07/15/0009
 - 벤처스퀘어, 휘슬 고정형·이동형 CCTV 알림 (2026.9.18): https://www.venturesquare.net/1115026/
 - 경북매일, 소화시설 5m 과태료(안전표지 유무) (2019.9.8): https://kbmaeil.com/article/201909080259926

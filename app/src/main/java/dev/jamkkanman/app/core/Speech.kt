@@ -8,11 +8,8 @@ object Speech {
     fun won(amount: Int): String =
         if (amount % 10_000 == 0) "${amount / 10_000}만 원" else "%,d원".format(amount)
 
-    /** 5m 단위로 반올림한 거리 (음성용) */
-    fun meters(d: Double): String {
-        val rounded = ((d / 5.0).roundToInt() * 5).coerceAtLeast(5)
-        return "${rounded}미터"
-    }
+    /** 음성용 거리: 화면(metersShort)과 같은 숫자로 읽는다 (화면 8m인데 '10미터'라고 하지 않게) */
+    fun meters(d: Double): String = "${d.roundToInt().coerceAtLeast(1)}미터"
 
     /** 화면용 거리 */
     fun metersShort(d: Double): String = "${d.roundToInt().coerceAtLeast(1)}m"

@@ -20,10 +20,11 @@ class SpeechTest {
     }
 
     @Test
-    fun `음성 거리는 5m 단위, 최소 5m`() {
-        assertEquals("5미터", Speech.meters(1.0))
-        assertEquals("10미터", Speech.meters(8.0))
-        assertEquals("15미터", Speech.meters(13.0))
+    fun `음성 거리는 화면과 같은 숫자, 최소 1m`() {
+        assertEquals("1미터", Speech.meters(0.4))
+        assertEquals("8미터", Speech.meters(8.0))
+        assertEquals("17미터", Speech.meters(17.2))
+        assertEquals("17m", Speech.metersShort(17.2))
         assertEquals("3m", Speech.metersShort(3.4))
     }
 
@@ -45,7 +46,7 @@ class SpeechTest {
         val text = Speech.warning(hit(ZoneType.BUS_STOP, 3.0), spot, hour = 14)
         assertEquals(
             "버스정류장 10미터 안이에요. 주정차 금지구역이고, 과태료는 4만 원이에요. " +
-                "약 10미터만 옮기면 범위 밖이에요. 공영주차장까지 120미터예요.",
+                "약 8미터만 옮기면 범위 밖이에요. 공영주차장까지 120미터예요.",
             text,
         )
     }
@@ -54,7 +55,7 @@ class SpeechTest {
     fun `안전벨트가 풀려 멈춘 경우 문 열기 전 확인, 옮길 때는 벨트를 다시 매라고 한다`() {
         val text = Speech.warning(hit(ZoneType.BUS_STOP, 3.0), null, hour = 14, belt = true)
         assertTrue(text.startsWith("문 열기 전에 확인해 주세요. 버스정류장 10미터 안이에요."))
-        assertTrue(text.contains("옮기려면 안전벨트를 다시 맨 뒤 약 10미터 옮겨 주세요."))
+        assertTrue(text.contains("옮기려면 안전벨트를 다시 맨 뒤 약 8미터 옮겨 주세요."))
         assertFalse(text.contains("만 옮기면"))
     }
 
